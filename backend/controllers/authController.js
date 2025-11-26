@@ -62,3 +62,63 @@ export const register = async (req, res) => {
   }
 };
 
+
+
+/**
+ * @route   POST /api/auth/login
+ * @desc    Login user and return token
+ * @access  Public
+ */
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // 1️⃣ Check if email & password provided
+    if (!email || !password) {
+      return res.status(400).json({
+        message: "Please enter email and password",
+      });
+    }
+
+    // 2️⃣ Check if user exists
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(400).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    // 3️⃣ Compare entered password with hashed password
+    const isMatch = await user.comparePassword(password);
+
+    if (!isMatch) {
+      return res.status(400).json({
+        message: "Invalid email or password",
+      });
+    }
+
+    // 4️⃣ Generate token
+    const token = generateToken(user);
+
+    // 5️⃣ Return user data + token
+    res.status(200).json({
+      message: "Login successful",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        branch: user.branch,
+      },
+      token,
+    });
+
+  } catch (error) {
+    console.error("Login error:", error);
+    res.status(500).json({
+      message: "Server error during login",
+    });
+  }
+};
