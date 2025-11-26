@@ -4,50 +4,39 @@ const eventSchema = new mongoose.Schema(
   {
     title: {
       type: String,
-      required: [true, "Event title is required"],
+      required: true,
       trim: true,
     },
 
     description: {
       type: String,
-      required: [true, "Event description is required"],
+      required: true,
     },
 
     date: {
       type: Date,
-      required: [true, "Event date is required"],
+      required: true,
     },
 
-    status: {
+    venue: {
       type: String,
-      enum: ["upcoming", "ongoing", "previous"],
-      default: "upcoming",
+      required: true,
     },
 
     branch: {
-      type: String,   // IT, CS, ENTC, Mechanical, etc.
-      default: "all", // If event is for whole college
-    },
-
-    image: {
-      type: String,   // Cloudinary URL
-      default: "",
+      type: String,
+      default: "ALL",
     },
 
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",   // faculty or admin
+      ref: "User",
       required: true,
     },
-
-    volunteers: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User", // students who applied as volunteers
-      },
-    ],
   },
   { timestamps: true }
 );
 
-export default mongoose.model("Event", eventSchema);
+const Event = mongoose.model("Event", eventSchema);
+
+export default Event;
