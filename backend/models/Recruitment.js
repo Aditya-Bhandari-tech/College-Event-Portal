@@ -1,38 +1,72 @@
 import mongoose from "mongoose";
 
-const recruitmentSchema = new mongoose.Schema(
+const applicantSchema = new mongoose.Schema(
   {
-    eventId: {
+    student: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Event",
-      required: [true, "Event ID is required"],
-    },
-
-    role: {
-      type: String,
-      required: [true, "Volunteer role is required"],
-      trim: true,
-    },
-
-    description: {
-      type: String,
-      required: [true, "Role description is required"],
-    },
-
-    createdBy: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User", // Faculty or Admin
+      ref: "User",
       required: true,
     },
-
-    applicants: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "User", // students applying for volunteer role
-      },
-    ],
+    note: {
+      type: String, // optional message like "I have anchoring experience"
+      default: "",
+    },
+    status: {
+      type: String,
+      enum: ["applied", "selected", "rejected"],
+      default: "applied",
+    },
   },
   { timestamps: true }
 );
 
-export default mongoose.model("Recruitment", recruitmentSchema);
+const recruitmentSchema = new mongoose.Schema(
+  {
+    event: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Event",
+      required: true,
+    },
+
+    title: {
+      type: String,
+      required: [true, "Recruitment title is required"],
+      trim: true,
+    },
+
+    roleType: {
+      type: String,
+      enum: ["volunteer", "anchor", "coordinator", "technical", "other"],
+      default: "volunteer",
+    },
+
+    description: {
+      type: String,
+      required: [true, "Recruitment description is required"],
+    },
+
+    branch: {
+      type: String, // e.g. "CSE", "IT", "all"
+      default: "all",
+    },
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User", // faculty/admin
+      required: true,
+    },
+
+    status: {
+      type: String,
+      enum: ["open", "closed"],
+      default: "open",
+    },
+
+    applicants: [applicantSchema],
+  },
+  { timestamps: true }
+);
+
+const Recruitment = mongoose.model("Recruitment", recruitmentSchema);
+
+export default Recruitment;
