@@ -1,61 +1,73 @@
+// controllers/announcementController.js
 import Announcement from "../models/Announcement.js";
+import { sendSuccess, sendError } from "../utils/apiResponse.js";
 
-/** CREATE ANNOUNCEMENT */
-export const createAnnouncement = async (req, res) => {
+// CREATE ANNOUNCEMENT (FACULTY / ADMIN)
+export const createAnnouncement = async (req, res, next) => {
   try {
-    // ✅ Safe destructuring: if req.body is undefined, use {}
     const { title, message, branch } = req.body || {};
 
-    // ✅ Validation
     if (!title || !message) {
-      return res.status(400).json({
-        message: "Title and message are required",
-      });
+      return sendError(
+        res,
+        "Title and message are required",
+        400,
+        {
+          title: !title,
+          message: !message,
+        }
+      );
     }
 
     const announcement = await Announcement.create({
       title,
       message,
       branch, // if undefined, model default "all" will be used
-      createdBy: req.user._id, // from authMiddleware
+      createdBy: req.user._id,
     });
 
-    res.status(201).json({
-      message: "Announcement created successfully",
+    return sendSuccess(
+      res,
+      "Announcement created successfully",
       announcement,
-    });
+      201
+    );
   } catch (error) {
     console.error("Create announcement error:", error);
-    res.status(500).json({ message: "Server error" });
+    return next(error);
   }
 };
 
-/** GET ALL ANNOUNCEMENTS */
-export const getAnnouncements = async (req, res) => {
+// GET ALL ANNOUNCEMENTS (PUBLIC)
+export const getAnnouncements = async (req, res, next) => {
   try {
     const announcements = await Announcement.find()
       .sort({ createdAt: -1 })
-      .populate("createdBy", "name role"); // optional info about creator
+      .populate("createdBy", "name role");
 
     if (announcements.length === 0) {
-      return res.status(200).json({
-        message: "No announcements right now"
-        
-      });
+      return sendSuccess(
+        res,
+        "No announcements right now",
+        [],
+        200
+      );
     }
 
-    res.status(200).json({
-      message: "Announcements fetched successfully",
+    return sendSuccess(
+      res,
+      "Announcements fetched successfully",
       announcements,
-    });
+      200
+    );
   } catch (error) {
     console.error("Get announcements error:", error);
-    res.status(500).json({ message: "Server error" });
+    return next(error);
   }
 };
 
-/** GET SINGLE ANNOUNCEMENT */
-export const getAnnouncementById = async (req, res) => {
+// GET SINGLE ANNOUNCEMENT BY ID (PUBLIC)
+export const getAnnouncementById = async (req, res, next) => {
   try {
     const announcement = await Announcement.findById(req.params.id).populate(
       "createdBy",
@@ -63,21 +75,28 @@ export const getAnnouncementById = async (req, res) => {
     );
 
     if (!announcement) {
-      return res.status(404).json({ message: "Announcement not found" });
+      return sendError(res, "Announcement not found", 404);
     }
 
-    res.status(200).json({
-      message: "Announcement fetched successfully",
+    return sendSuccess(
+      res,
+      "Announcement fetched successfully",
       announcement,
-    });
+      200
+    );
   } catch (error) {
     console.error("Get announcement by id error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    if (error.name === "CastError") {
+      return sendError(res, "Invalid announcement id", 400);
+    }
+
+    return next(error);
   }
 };
 
-/** UPDATE ANNOUNCEMENT */
-export const updateAnnouncement = async (req, res) => {
+// UPDATE ANNOUNCEMENT (FACULTY / ADMIN)
+export const updateAnnouncement = async (req, res, next) => {
   try {
     const announcement = await Announcement.findByIdAndUpdate(
       req.params.id,
@@ -86,33 +105,48 @@ export const updateAnnouncement = async (req, res) => {
     );
 
     if (!announcement) {
-      return res.status(404).json({ message: "Announcement not found" });
+      return sendError(res, "Announcement not found", 404);
     }
 
-    res.status(200).json({
-      message: "Announcement updated successfully",
+    return sendSuccess(
+      res,
+      "Announcement updated successfully",
       announcement,
-    });
+      200
+    );
   } catch (error) {
     console.error("Update announcement error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    if (error.name === "CastError") {
+      return sendError(res, "Invalid announcement id", 400);
+    }
+
+    return next(error);
   }
 };
 
-/** DELETE ANNOUNCEMENT */
-export const deleteAnnouncement = async (req, res) => {
+// DELETE ANNOUNCEMENT (ADMIN ONLY)
+export const deleteAnnouncement = async (req, res, next) => {
   try {
     const announcement = await Announcement.findByIdAndDelete(req.params.id);
 
     if (!announcement) {
-      return res.status(404).json({ message: "Announcement not found" });
+      return sendError(res, "Announcement not found", 404);
     }
 
-    res.status(200).json({
-      message: "Announcement deleted successfully",
-    });
+    return sendSuccess(
+      res,
+      "Announcement deleted successfully",
+      null,
+      200
+    );
   } catch (error) {
     console.error("Delete announcement error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    if (error.name === "CastError") {
+      return sendError(res, "Invalid announcement id", 400);
+    }
+
+    return next(error);
   }
 };

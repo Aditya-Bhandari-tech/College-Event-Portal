@@ -1,49 +1,73 @@
 // controllers/adminController.js
 import User from "../models/User.js";
+import { sendSuccess, sendError } from "../utils/apiResponse.js";
 
-/** GET ALL USERS (ADMIN ONLY) */
-export const getAllUsers = async (req, res) => {
+// GET ALL USERS (ADMIN ONLY)
+export const getAllUsers = async (req, res, next) => {
   try {
-    const users = await User.find().select("-password").sort({ createdAt: -1 });
+    const users = await User.find()
+      .select("-password")
+      .sort({ createdAt: -1 });
 
-    res.status(200).json({
-      message: "Users fetched successfully",
+    if (users.length === 0) {
+      return sendSuccess(
+        res,
+        "No users found",
+        [],
+        200
+      );
+    }
+
+    return sendSuccess(
+      res,
+      "Users fetched successfully",
       users,
-    });
+      200
+    );
   } catch (error) {
     console.error("Get all users error:", error);
-    res.status(500).json({ message: "Server error" });
+    return next(error);
   }
 };
 
-/** GET SINGLE USER BY ID (ADMIN ONLY) */
-export const getUserById = async (req, res) => {
+// GET SINGLE USER BY ID (ADMIN ONLY)
+export const getUserById = async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id).select("-password");
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return sendError(res, "User not found", 404);
     }
 
-    res.status(200).json({
-      message: "User fetched successfully",
+    return sendSuccess(
+      res,
+      "User fetched successfully",
       user,
-    });
+      200
+    );
   } catch (error) {
     console.error("Get user by id error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    if (error.name === "CastError") {
+      return sendError(res, "Invalid user id", 400);
+    }
+
+    return next(error);
   }
 };
 
-/** UPDATE USER ROLE (ADMIN ONLY) */
-export const updateUserRole = async (req, res) => {
+// UPDATE USER ROLE (ADMIN ONLY)
+export const updateUserRole = async (req, res, next) => {
   try {
-    const { role } = req.body;
-
-    // only allow valid roles
+    const { role } = req.body || {};
     const allowedRoles = ["student", "faculty", "admin"];
+
+    if (!role) {
+      return sendError(res, "Role is required", 400, { role: true });
+    }
+
     if (!allowedRoles.includes(role)) {
-      return res.status(400).json({ message: "Invalid role value" });
+      return sendError(res, "Invalid role value", 400);
     }
 
     const user = await User.findByIdAndUpdate(
@@ -53,36 +77,48 @@ export const updateUserRole = async (req, res) => {
     ).select("-password");
 
     if (!user) {
-      return res.status(404).json({ message: "User not found" });
+      return sendError(res, "User not found", 404);
     }
 
-    res.status(200).json({
-      message: "User role updated successfully",
+    return sendSuccess(
+      res,
+      "User role updated successfully",
       user,
-    });
+      200
+    );
   } catch (error) {
     console.error("Update user role error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    if (error.name === "CastError") {
+      return sendError(res, "Invalid user id", 400);
+    }
+
+    return next(error);
   }
 };
 
-/** DELETE USER (ADMIN ONLY, OPTIONAL) */
-export const deleteUser = async (req, res) => {
+// DELETE USER (ADMIN ONLY)
+export const deleteUser = async (req, res, next) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);
 
     if (!user) {
-      return res.status(404).json({ message: "User not found"
-       });
+      return sendError(res, "User not found", 404);
     }
 
-    res.status(200).json({
-      message: "User deleted successfully",
-      
-        "name": user.name
-    });
+    return sendSuccess(
+      res,
+      "User deleted successfully",
+      null,
+      200
+    );
   } catch (error) {
     console.error("Delete user error:", error);
-    res.status(500).json({ message: "Server error" });
+
+    if (error.name === "CastError") {
+      return sendError(res, "Invalid user id", 400);
+    }
+
+    return next(error);
   }
 };

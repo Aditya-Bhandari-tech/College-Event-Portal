@@ -15,19 +15,23 @@ const eventRequestSchema = new mongoose.Schema(
 
     date: {
       type: Date,
-      required: [true, "Proposed event date is required"],
+      required: [true, "Event date is required"],
     },
 
-    studentId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Student ID is required"],
+    venue: {
+      type: String,
+      required: [true, "Venue is required"],
     },
 
-    facultyId: {
+    branch: {
+      type: String, // e.g. CSE, IT, all
+      default: "all",
+    },
+
+    requestedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: [true, "Faculty ID is required"],
+      ref: "User", // student who requested
+      required: true,
     },
 
     status: {
@@ -36,12 +40,26 @@ const eventRequestSchema = new mongoose.Schema(
       default: "pending",
     },
 
-    rejectionReason: {
+    reviewComment: {
       type: String,
       default: "",
+    },
+
+    reviewedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User", // faculty/admin who approved/rejected
+    },
+
+    // If approved and actual Event created, store its id
+    event: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Event",
+      default: null,
     },
   },
   { timestamps: true }
 );
 
-export default mongoose.model("EventRequest", eventRequestSchema);
+const EventRequest = mongoose.model("EventRequest", eventRequestSchema);
+
+export default EventRequest;

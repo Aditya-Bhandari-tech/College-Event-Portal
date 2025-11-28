@@ -9,6 +9,7 @@ import adminRoutes from "./routes/adminRoutes.js";
 import announcementRoutes from "./routes/announcementRoutes.js";
 import recruitmentRoutes from "./routes/recruitmentRoutes.js";
 import errorHandler from "./middleware/errorHandler.js";
+import eventRequestRoutes from "./routes/eventRequestRoutes.js";
 
 
 dotenv.config();
@@ -26,6 +27,7 @@ app.use("/api/events", eventRoutes);
 app.use("/api/admin", adminRoutes); 
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/recruitments", recruitmentRoutes);
+app.use("/api/event-requests", eventRequestRoutes);
 
 
 //  Global error handler MUST be after routes

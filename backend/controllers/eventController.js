@@ -1,9 +1,25 @@
+// controllers/eventController.js
 import Event from "../models/Event.js";
+import { sendSuccess, sendError } from "../utils/apiResponse.js";
 
-/** CREATE EVENT */
-export const createEvent = async (req, res) => {
+// CREATE EVENT (FACULTY / ADMIN)
+export const createEvent = async (req, res, next) => {
   try {
-    const { title, description, date, venue, branch } = req.body;
+    const { title, description, date, venue, branch } = req.body || {};
+
+    if (!title || !description || !date || !venue) {
+      return sendError(
+        res,
+        "title, description, date and venue are required",
+        400,
+        {
+          title: !title,
+          description: !description,
+          date: !date,
+          venue: !venue,
+        }
+      );
+    }
 
     const event = await Event.create({
       title,
@@ -14,85 +30,100 @@ export const createEvent = async (req, res) => {
       createdBy: req.user._id, // from authMiddleware
     });
 
-    res.status(201).json({
-      message: "Event created successfully",
-      event,
-    });
+    return sendSuccess(res, "Event created successfully", event, 201);
   } catch (error) {
-    console.log("Create Event Error:", error);
-    res.status(500).json({ message: "Server error" });
+    console.error("Create Event Error:", error);
+    return next(error);
   }
 };
 
-/** GET ALL EVENTS */
-export const getEvents = async (req, res) => {
+// GET ALL EVENTS (PUBLIC)
+export const getEvents = async (req, res, next) => {
   try {
     const events = await Event.find().sort({ date: 1 });
 
     if (events.length === 0) {
-      return res.status(200).json({
-        message: "No events right now"
-      });
+      return sendSuccess(res, "No events right now", [], 200);
     }
 
-    res.status(200).json({
-      message: "Events fetched successfully",
-      events: events
-    });
+    return sendSuccess(res, "Events fetched successfully", events, 200);
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Get Events Error:", error);
+    return next(error);
   }
 };
 
-
-/** GET EVENT BY ID */
-export const getEventById = async (req, res) => {
+// GET EVENT BY ID (PUBLIC)
+export const getEventById = async (req, res, next) => {
   try {
     const event = await Event.findById(req.params.id);
 
     if (!event) {
-      return res.status(404).json({ message: "Event not found" });
+      return sendError(res, "Event not found", 404);
     }
 
-    res.status(200).json(event);
+    return sendSuccess(res, "Event fetched successfully", event, 200);
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Get Event By Id Error:", error);
+
+    if (error.name === "CastError") {
+      return sendError(res, "Invalid event id", 400);
+    }
+
+    return next(error);
   }
 };
 
-/** UPDATE EVENT */
-export const updateEvent = async (req, res) => {
+// UPDATE EVENT (FACULTY / ADMIN)
+export const updateEvent = async (req, res, next) => {
   try {
-    const event = await Event.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true } // return updated event
-    );
+    const event = await Event.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+    });
 
     if (!event) {
-      return res.status(404).json({ message: "Event not found" });
+      return sendError(res, "Event not found", 404);
     }
 
-    res.status(200).json({
-      message: "Event updated successfully",
+    return sendSuccess(
+      res,
+      "Event updated successfully",
       event,
-    });
+      200
+    );
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Update Event Error:", error);
+
+    if (error.name === "CastError") {
+      return sendError(res, "Invalid event id", 400);
+    }
+
+    return next(error);
   }
 };
 
-/** DELETE EVENT */
-export const deleteEvent = async (req, res) => {
+// DELETE EVENT (ADMIN ONLY)
+export const deleteEvent = async (req, res, next) => {
   try {
     const event = await Event.findByIdAndDelete(req.params.id);
 
     if (!event) {
-      return res.status(404).json({ message: "Event not found" });
+      return sendError(res, "Event not found", 404);
     }
 
-    res.status(200).json({ message: "Event deleted successfully" });
+    return sendSuccess(
+      res,
+      "Event deleted successfully",
+      null,
+      200
+    );
   } catch (error) {
-    res.status(500).json({ message: "Server error" });
+    console.error("Delete Event Error:", error);
+
+    if (error.name === "CastError") {
+      return sendError(res, "Invalid event id", 400);
+    }
+
+    return next(error);
   }
 };
