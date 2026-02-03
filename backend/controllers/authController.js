@@ -9,39 +9,37 @@ import generateToken from "../utils/generateToken.js";
  */
 export const register = async (req, res) => {
   try {
-    const { name, email, password, role, phone, branch } = req.body;
+    const { name, email, password, phone, branch } = req.body;
 
-    // 1️⃣ Basic validation
-    if (!name || !email || !password) {
+    // 1️⃣ Required fields check
+    if (!name || !email || !password || !branch) {
       return res.status(400).json({
-        message: "Name, email and password are required",
+        message: "Name, email, password and branch are required",
       });
     }
 
     // 2️⃣ Check if user already exists
     const existingUser = await User.findOne({ email });
-
     if (existingUser) {
       return res.status(400).json({
         message: "User with this email already exists",
       });
     }
 
-    // 3️⃣ Create new user
-    // ⚠️ Password is plain here, but our User model's pre-save hook will hash it
+    // 3️⃣ Create student user ONLY
     const user = await User.create({
       name,
       email,
       password,
-      role,   // optional, default = "student" if not sent
       phone,
       branch,
+      role: "student", // 🔒 FORCE ROLE
     });
 
-    // 4️⃣ Generate JWT token
+    // 4️⃣ Generate token
     const token = generateToken(user);
 
-    // 5️⃣ Send response (never send password back)
+    // 5️⃣ Send response
     res.status(201).json({
       message: "User registered successfully",
       user: {
@@ -54,13 +52,32 @@ export const register = async (req, res) => {
       },
       token,
     });
+
   } catch (error) {
     console.error("Register error:", error);
+
+    // ✅ Mongoose validation errors
+    if (error.name === "ValidationError") {
+      const messages = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({
+        message: messages.join(", "),
+      });
+    }
+
+    // ✅ Duplicate key error (safety net)
+    if (error.code === 11000) {
+      return res.status(400).json({
+        message: "Email already registered",
+      });
+    }
+
+    // ❌ Genuine server error
     res.status(500).json({
       message: "Server error during registration",
     });
   }
 };
+
 
 
 
