@@ -1,49 +1,49 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";  
 
-const userSchema = new mongoose.Schema(
-  {
-    name: {
-      type: String,
-      required: true,
-      trim: true,
-    },
-
-    email: {
-      type: String,
-      required: [true, "Please provide an email"],
-      unique: true,
-      lowercase: true,
-      match: [
-        /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
-        "Please provide a valid email",
-      ],
-    },
-
-    phone: {
-      type: String,
-      match: [/^[0-9]{10}$/, "Phone must be 10 digits"],
-    },
-
-    password: {
-      type: String,
-      required: true,
-      minlength: 6,
-    },
-
-    role: {
-      type: String,
-      enum: ["student", "faculty", "admin"],
-      default: "student",
-    },
-
-    branch: {
-      type: String,
-      default: null,
-    },
+const userSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: [true, "Name is required"],
+    trim: true,
   },
-  { timestamps: true }
-);
+
+  email: {
+    type: String,
+    required: [true, "Email is required"],
+    unique: true,
+    lowercase: true,
+    match: [
+      /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+      "Please provide a valid email",
+    ],
+  },
+
+  password: {
+    type: String,
+    required: [true, "Password is required"],
+    minlength: [6, "Password must be at least 6 characters"],
+  },
+
+  phone: {
+    type: String,
+    match: [/^\d{10}$/, "Phone must be 10 digits"],
+    required: false,
+  },
+
+  branch: {
+    type: String,
+    required: [true, "Branch is required"],
+  },
+
+  role: {
+    type: String,
+    enum: ["student"], // 🔒 locked
+    default: "student",
+  },
+  
+});
+
 
 /**
  * 🔐 Pre-save hook
