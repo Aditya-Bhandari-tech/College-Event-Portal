@@ -9,12 +9,22 @@ import generateToken from "../utils/generateToken.js";
  */
 export const register = async (req, res) => {
   try {
-    const { name, email, password, phone, branch } = req.body;
+    const { name, email, password, phone, branch, role } = req.body;
 
-    // 1️⃣ Required fields check
+    // Normalize role
+    const normalizedRole = role ? role.toLowerCase().trim() : "student";
+
+    // 1️⃣ Required fields check (Note: role is already checked/defaulted above but good to keep structure)
     if (!name || !email || !password || !branch) {
       return res.status(400).json({
-        message: "Name, email, password and branch are required",
+        message: "Name, email, password, and branch are required",
+      });
+    }
+
+    // Validate role
+    if (!["student", "faculty"].includes(normalizedRole)) {
+      return res.status(400).json({
+        message: "Invalid role selected",
       });
     }
 
@@ -26,32 +36,49 @@ export const register = async (req, res) => {
       });
     }
 
-    // 3️⃣ Create student user ONLY
+    // 3️⃣ Create user
     const user = await User.create({
       name,
       email,
       password,
       phone,
       branch,
-      role: "student", // 🔒 FORCE ROLE
+      role: normalizedRole, // Use normalized role
     });
 
-    // 4️⃣ Generate token
-    const token = generateToken(user);
+    // 4️⃣ Handle Response based on Role
+    if (normalizedRole === "faculty") {
+      // Faculty: No token, pending approval
+      res.status(201).json({
+        message: "Registration successful! Please wait for admin approval.",
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          phone: user.phone,
+          branch: user.branch,
+          isApproved: user.isApproved, // Should be false by default for faculty
+        },
+      });
+    } else {
+      // Student: Auto-login with token
+      const token = generateToken(user);
 
-    // 5️⃣ Send response
-    res.status(201).json({
-      message: "User registered successfully",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        phone: user.phone,
-        branch: user.branch,
-      },
-      token,
-    });
+      res.status(201).json({
+        message: "User registered successfully",
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          phone: user.phone,
+          branch: user.branch,
+          isApproved: user.isApproved,
+        },
+        token,
+      });
+    }
 
   } catch (error) {
     console.error("Register error:", error);
@@ -103,6 +130,13 @@ export const login = async (req, res) => {
     if (!user) {
       return res.status(400).json({
         message: "Invalid email or password",
+      });
+    }
+
+    // 🔒 Check isApproved
+    if (!user.isApproved) {
+      return res.status(403).json({
+        message: "Account pending approval",
       });
     }
 

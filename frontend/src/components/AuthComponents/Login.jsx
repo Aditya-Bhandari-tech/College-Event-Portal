@@ -78,8 +78,14 @@ const Login = () => {
           <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 shadow-2xl">
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Error Message */}
+              {/* Error Message */}
               {error && (
-                <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-xl text-sm backdrop-blur-sm">
+                <div
+                  className={`${error.includes("approval")
+                      ? "bg-amber-500/10 border-amber-500/50 text-amber-400"
+                      : "bg-red-500/10 border-red-500/50 text-red-400"
+                    } px-4 py-3 border rounded-xl text-sm backdrop-blur-sm`}
+                >
                   {error}
                 </div>
               )}

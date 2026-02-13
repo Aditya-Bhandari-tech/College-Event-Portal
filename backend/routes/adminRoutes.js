@@ -1,10 +1,10 @@
-// routes/adminRoutes.js
 import express from "express";
 import {
   getAllUsers,
   getUserById,
   updateUserRole,
   deleteUser,
+  approveUser,
 } from "../controllers/adminController.js";
 
 import {
@@ -25,6 +25,9 @@ router.get("/users/:id", getUserById);
 
 // PATCH /api/admin/users/:id/role -> update role
 router.patch("/users/:id/role", updateUserRole);
+
+// PUT /api/admin/users/:id/approve -> approve user
+router.put("/users/:id/approve", approveUser);
 
 // DELETE /api/admin/users/:id -> delete user
 router.delete("/users/:id", deleteUser);
