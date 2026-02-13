@@ -36,12 +36,18 @@ const userSchema = new mongoose.Schema({
     required: [true, "Branch is required"],
   },
 
-  role: {
-    type: String,
-    enum: ["student"], // 🔒 locked
-    default: "student",
-  },
   
+  role: {
+  type: String,
+  enum: ["student", "faculty", "admin"],
+  default: "student"
+},
+isApproved: {
+  type: Boolean,
+  default: function() {
+    return this.role === "student";
+  }
+}
 });
 
 

@@ -16,6 +16,7 @@ const Signup = () => {
   });
 
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
@@ -38,9 +39,10 @@ const Signup = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccessMessage("");
 
     // Frontend validation
-    if (!formData.name || !formData.email || !formData.password || !formData.branch) {
+    if (!formData.name || !formData.email || !formData.password || !formData.role || !formData.branch) {
       setError("Please fill in all required fields");
       setLoading(false);
       return;
@@ -61,10 +63,19 @@ const Signup = () => {
     try {
       const response = await axiosInstance.post("/auth/register", formData);
 
-      localStorage.setItem("token", response.data.token);
-      localStorage.setItem("user", JSON.stringify(response.data.user));
+      if (response.data.token) {
+        // Token exists -> Student / Auto-login
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+        navigate("/dashboard");
+      } else {
+        // No token -> Faculty / Pending Approval
+        setSuccessMessage("Your request has been sent to admin for approval.");
+        setTimeout(() => {
+          navigate("/login");
+        }, 3000);
+      }
 
-      navigate("/dashboard");
     } catch (err) {
       setError(err.response?.data?.message || "Registration failed");
     } finally {
@@ -96,6 +107,13 @@ const Signup = () => {
           {/* Form Card */}
           <div className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 shadow-2xl">
             <form onSubmit={handleSubmit} className="space-y-5">
+              {/* Success Message */}
+              {successMessage && (
+                <div className="bg-green-500/10 border border-green-500/50 text-green-400 px-4 py-3 rounded-xl text-sm backdrop-blur-sm">
+                  {successMessage}
+                </div>
+              )}
+
               {/* Error Message */}
               {error && (
                 <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-xl text-sm backdrop-blur-sm">
@@ -183,27 +201,48 @@ const Signup = () => {
                 />
               </div>
 
-              {/* Branch */}
+              {/* Role */}
               <div>
-                <label htmlFor="branch" className="block text-sm font-medium text-slate-300 mb-2">
-                  Branch *
+                <label htmlFor="role" className="block text-sm font-medium text-slate-300 mb-2">
+                  Role *
                 </label>
                 <select
-                  id="branch"
-                  name="branch"
+                  id="role"
+                  name="role"
                   required
-                  value={formData.branch}
+                  value={formData.role}
                   onChange={handleChange}
                   className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition backdrop-blur-sm"
                 >
-                  <option value="" className="bg-slate-900">Select your branch</option>
-                  {branches.map((branch) => (
-                    <option key={branch} value={branch} className="bg-slate-900">
-                      {branch}
-                    </option>
-                  ))}
+                  <option value="" className="bg-slate-900">Select your role</option>
+                  <option value="student" className="bg-slate-900">Student</option>
+                  <option value="faculty" className="bg-slate-900">Faculty</option>
                 </select>
               </div>
+
+              {/* Branch - Show for both Student and Faculty */}
+              {(formData.role === "student" || formData.role === "faculty") && (
+                <div>
+                  <label htmlFor="branch" className="block text-sm font-medium text-slate-300 mb-2">
+                    Branch *
+                  </label>
+                  <select
+                    id="branch"
+                    name="branch"
+                    required
+                    value={formData.branch}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/50 focus:border-transparent transition backdrop-blur-sm"
+                  >
+                    <option value="" className="bg-slate-900">Select your branch</option>
+                    {branches.map((branch) => (
+                      <option key={branch} value={branch} className="bg-slate-900">
+                        {branch}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               {/* Submit Button */}
               <button

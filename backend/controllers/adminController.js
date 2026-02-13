@@ -97,6 +97,36 @@ export const updateUserRole = async (req, res, next) => {
   }
 };
 
+// APPROVE USER (ADMIN ONLY)
+export const approveUser = async (req, res, next) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { isApproved: true },
+      { new: true }
+    ).select("-password");
+
+    if (!user) {
+      return sendError(res, "User not found", 404);
+    }
+
+    return sendSuccess(
+      res,
+      "User approved successfully",
+      user,
+      200
+    );
+  } catch (error) {
+    console.error("Approve user error:", error);
+
+    if (error.name === "CastError") {
+      return sendError(res, "Invalid user id", 400);
+    }
+
+    return next(error);
+  }
+};
+
 // DELETE USER (ADMIN ONLY)
 export const deleteUser = async (req, res, next) => {
   try {
