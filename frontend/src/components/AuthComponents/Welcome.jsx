@@ -1,9 +1,12 @@
 // src/pages/Welcome.jsx
 import { useNavigate } from "react-router-dom";
+
 import { Calendar, Users, Zap, Bell, CheckCircle, ArrowRight, Megaphone, UserCheck, Shield } from "lucide-react";
 
 function Welcome() {
   const navigate = useNavigate();
+  console.log(import.meta.env.VITE_GOOGLE_CLIENT_ID);
+
   
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-slate-900 via-slate-950 to-black text-white">
