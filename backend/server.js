@@ -10,6 +10,7 @@ import announcementRoutes from "./routes/announcementRoutes.js";
 import recruitmentRoutes from "./routes/recruitmentRoutes.js";
 import errorHandler from "./middleware/errorHandler.js";
 import eventRequestRoutes from "./routes/eventRequestRoutes.js";
+import googleAuthRoutes from "./routes/googleAuth.js";
 
 
 dotenv.config();
@@ -21,6 +22,7 @@ app.use(express.json());
 app.use(cors());
 
 //  Routes
+app.use("/api/auth", googleAuthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/events", eventRoutes); 
