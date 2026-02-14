@@ -3,7 +3,7 @@ import Welcome from "./components/AuthComponents/Welcome";
 import Signup from "./components/AuthComponents/Signup";
 import Login from "./components/AuthComponents/Login";
 
-import NotFound from "./components/pages/NotFound";
+import NotFound from "./pages/NotFound";
 
 export default function App() {
   return (
