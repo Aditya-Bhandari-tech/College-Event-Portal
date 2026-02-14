@@ -12,6 +12,14 @@
   }
 }
 
+@theme {
+  --color-primary-600: #2563eb;
+  --color-dark-900: #0f172a;
+  --radius-card: 12px;
+  /* All your custom theme variables */
+}
+
+/* Plus all custom component styles */
 .animate-float {
   animation: float 20s ease-in-out infinite;
 }
