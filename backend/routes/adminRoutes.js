@@ -1,4 +1,5 @@
 import express from "express";
+import { getDashboardSummary } from "../controllers/adminController.js";
 import {
   getAllUsers,
   getUserById,
@@ -31,5 +32,7 @@ router.put("/users/:id/approve", approveUser);
 
 // DELETE /api/admin/users/:id -> delete user
 router.delete("/users/:id", deleteUser);
+
+router.get("/dashboard-summary", getDashboardSummary);
 
 export default router;

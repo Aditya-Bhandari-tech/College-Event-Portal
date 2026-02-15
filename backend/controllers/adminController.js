@@ -1,6 +1,10 @@
 // controllers/adminController.js
 import User from "../models/User.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
+import Event from "../models/Event.js";
+import EventRequest from "../models/EventRequest.js";
+import Recruitment from "../models/Recruitment.js";
+import Announcement from "../models/Announcement.js";
 
 // GET ALL USERS (ADMIN ONLY)
 export const getAllUsers = async (req, res, next) => {
@@ -149,6 +153,43 @@ export const deleteUser = async (req, res, next) => {
       return sendError(res, "Invalid user id", 400);
     }
 
+    return next(error);
+  }
+};
+// GET DASHBOARD SUMMARY (ADMIN ONLY)
+export const getDashboardSummary = async (req, res, next) => {
+  try {
+    const [
+      totalUsers,
+      totalEvents,
+      pendingFaculty,
+      pendingRequests,
+      openRecruitments,
+      totalAnnouncements,
+    ] = await Promise.all([
+      User.countDocuments(),
+      Event.countDocuments(),
+      User.countDocuments({ role: "faculty", isApproved: false }),
+      EventRequest.countDocuments({ status: "pending" }),
+      Recruitment.countDocuments({ status: "open" }),
+      Announcement.countDocuments(),
+    ]);
+
+    return sendSuccess(
+      res,
+      "Dashboard summary fetched successfully",
+      {
+        totalUsers,
+        totalEvents,
+        pendingFaculty,
+        pendingRequests,
+        openRecruitments,
+        totalAnnouncements,
+      },
+      200
+    );
+  } catch (error) {
+    console.error("Dashboard summary error:", error);
     return next(error);
   }
 };
