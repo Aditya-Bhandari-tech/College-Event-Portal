@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/useAuth';
+import { useAuth } from '../hooks/useAuth';
 
 const NotFound = () => {
   const { user } = useAuth();
@@ -18,25 +18,25 @@ const NotFound = () => {
             <div className="error-number">404</div>
             <div className="error-icon">🔍</div>
           </div>
-          
+
           <div className="error-text">
             <h1>Page Not Found</h1>
             <p>
-              Oops! The page you're looking for seems to have wandered off. 
+              Oops! The page you're looking for seems to have wandered off.
               Don't worry, even the best explorers get lost sometimes!
             </p>
           </div>
-          
+
           <div className="error-actions">
             <button onClick={goBack} className="btn btn-outline">
               Go Back
             </button>
-            
+
             <Link to={user ? "/dashboard" : "/"} className="btn btn-primary">
               {user ? "Go to Dashboard" : "Go Home"}
             </Link>
           </div>
-          
+
           {user && (
             <div className="quick-links">
               <p>Or try one of these popular sections:</p>
@@ -58,7 +58,7 @@ const NotFound = () => {
           )}
         </div>
       </div>
-      
+
       <style jsx>{`
         .not-found-page {
           display: flex;

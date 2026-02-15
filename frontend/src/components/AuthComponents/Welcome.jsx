@@ -5,9 +5,9 @@ import { Calendar, Users, Zap, Bell, CheckCircle, ArrowRight, Megaphone, UserChe
 
 function Welcome() {
   const navigate = useNavigate();
-  console.log(import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
-  
+
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-slate-900 via-slate-950 to-black text-white">
       {/* Floating gradients */}
@@ -49,7 +49,7 @@ function Welcome() {
                 <CheckCircle className="w-4 h-4 text-cyan-400" />
                 <span>For Faculty</span>
               </div>
-              
+
             </div>
           </div>
 
@@ -77,12 +77,12 @@ function Welcome() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full px-4">
             <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 transition-all duration-300 hover:border-cyan-500/50 hover:bg-white/10">
               <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/0 to-cyan-500/0 group-hover:from-cyan-500/10 group-hover:to-transparent transition-all duration-300" />
-              
+
               <div className="relative z-10">
                 <div className="mb-4 inline-flex items-center justify-center w-14 h-14 rounded-xl bg-cyan-500/10 border border-cyan-500/20">
                   <Calendar className="w-7 h-7 text-cyan-400" />
                 </div>
-                
+
                 <h3 className="text-xl font-bold text-white mb-2">Events</h3>
                 <p className="text-slate-400 text-sm">
                   Discover and register for campus activities
@@ -92,12 +92,12 @@ function Welcome() {
 
             <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 transition-all duration-300 hover:border-pink-500/50 hover:bg-white/10">
               <div className="absolute inset-0 bg-gradient-to-br from-pink-500/0 to-pink-500/0 group-hover:from-pink-500/10 group-hover:to-transparent transition-all duration-300" />
-              
+
               <div className="relative z-10">
                 <div className="mb-4 inline-flex items-center justify-center w-14 h-14 rounded-xl bg-pink-500/10 border border-pink-500/20">
                   <Megaphone className="w-7 h-7 text-pink-400" />
                 </div>
-                
+
                 <h3 className="text-xl font-bold text-white mb-2">Announcements</h3>
                 <p className="text-slate-400 text-sm">
                   Stay updated with campus news
@@ -107,12 +107,12 @@ function Welcome() {
 
             <div className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 transition-all duration-300 hover:border-purple-500/50 hover:bg-white/10">
               <div className="absolute inset-0 bg-gradient-to-br from-purple-500/0 to-purple-500/0 group-hover:from-purple-500/10 group-hover:to-transparent transition-all duration-300" />
-              
+
               <div className="relative z-10">
                 <div className="mb-4 inline-flex items-center justify-center w-14 h-14 rounded-xl bg-purple-500/10 border border-purple-500/20">
                   <Bell className="w-7 h-7 text-purple-400" />
                 </div>
-                
+
                 <h3 className="text-xl font-bold text-white mb-2">Real-time</h3>
                 <p className="text-slate-400 text-sm">
                   Instant notifications
@@ -374,7 +374,7 @@ function Welcome() {
             <p className="text-slate-400 text-lg mb-8 max-w-2xl mx-auto">
               Join thousands of students, faculty, and staff already using Campus Pulse to stay connected with their campus community.
             </p>
-            
+
             <div className="flex gap-4 justify-center">
               <button
                 onClick={() => navigate("/signup")}
