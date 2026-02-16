@@ -47,7 +47,13 @@ isApproved: {
   default: function() {
     return this.role === "student";
   }
+},
+profilePic: {
+  public_id: String,
+  url: String,
 }
+
+
 });
 
 
