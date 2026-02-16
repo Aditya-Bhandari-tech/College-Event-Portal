@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+/* Prevent white flash on page load */
+html,
+body {
+  background-color: #020617; /* slate-950 */
+  margin: 0;
+  padding: 0;
+}
+
+#root {
+  background-color: #020617; /* slate-950 */
+}
+
+
 @keyframes float {
   0%, 100% {
     transform: translate(0, 0) rotate(0deg);

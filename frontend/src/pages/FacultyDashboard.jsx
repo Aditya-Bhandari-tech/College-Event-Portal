@@ -1,0 +1,821 @@
+import React, { useState, useEffect } from 'react';
+import {
+    Calendar, Users, Bell, Search, Image,
+    UserPlus, Edit, Trash, Plus, FileText, CheckCircle, XCircle,
+    UserCheck, ChevronRight, Menu, LogOut, Settings, Award, Check, X, Download
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import axiosInstance from '../api/axios';
+
+const FacultyDashboard = () => {
+    const navigate = useNavigate();
+    const [user, setUser] = useState(null);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [activeRoute, setActiveRoute] = useState('Dashboard');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    // Stats
+    const [stats, setStats] = useState({
+        ongoing: 0,
+        upcoming: 0,
+        finished: 0,
+        students: 0
+    });
+
+    // Data Lists
+    const [events, setEvents] = useState([]);
+    const [requests, setRequests] = useState([]);
+    const [recruitments, setRecruitments] = useState([]);
+    const [students, setStudents] = useState([]);
+    const [announcements, setAnnouncements] = useState([]);
+    const [galleryItems, setGalleryItems] = useState([]);
+
+    // Modals
+    const [showEventModal, setShowEventModal] = useState(false);
+    const [showRecruitmentModal, setShowRecruitmentModal] = useState(false);
+    const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+    const [showApplicantsModal, setShowApplicantsModal] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null); // For edit/view applicants
+
+    // Forms
+    const [eventForm, setEventForm] = useState({ title: '', description: '', date: '', venue: '', branch: '' });
+    const [recruitmentForm, setRecruitmentForm] = useState({ title: '', roleType: '', description: '', branch: '', eventId: '' });
+    const [announcementForm, setAnnouncementForm] = useState({ title: '', message: '', branch: '' });
+
+    // Loading States
+    const [loading, setLoading] = useState({
+        events: false,
+        requests: false,
+        recruitments: false,
+        students: false,
+        announcements: false,
+        applicants: false
+    });
+
+    useEffect(() => {
+        const storedUser = localStorage.getItem('user');
+        if (!storedUser) {
+            navigate('/login');
+            return;
+        }
+        const parsedUser = JSON.parse(storedUser);
+        if (parsedUser.role !== 'faculty') {
+            navigate('/login');
+            return;
+        }
+        setUser(parsedUser);
+
+        // Timer
+        const timer = setInterval(() => setCurrentTime(new Date()), 60000);
+        return () => clearInterval(timer);
+    }, [navigate]);
+
+    useEffect(() => {
+        if (!user) return;
+        // Initial Fetch for Stats on mount (or when dashboard is active)
+        if (activeRoute === 'Dashboard') {
+            fetchEvents(true);
+            fetchStudents(true);
+        }
+    }, [user, activeRoute]);
+
+    useEffect(() => {
+        if (!user) return;
+        switch (activeRoute) {
+            case 'Events':
+                fetchEvents();
+                break;
+            case 'Event Requests':
+                fetchRequests();
+                break;
+            case 'Recruitment':
+                fetchEvents(); // Needed for dropdown
+                fetchRecruitments();
+                break;
+            case 'Students':
+                fetchStudents();
+                break;
+            case 'Announcements':
+                fetchAnnouncements();
+                break;
+            default:
+                break;
+        }
+    }, [activeRoute, user]);
+
+
+    // API Calls
+    const fetchEvents = async (forStats = false) => {
+        if (!forStats) setLoading(prev => ({ ...prev, events: true }));
+        try {
+            const res = await axiosInstance.get('/events');
+            const allEvents = res.data.data || [];
+
+            if (activeRoute === 'Dashboard' || forStats) {
+                const now = new Date();
+                const ongoing = allEvents.filter(e => new Date(e.date).toDateString() === now.toDateString()).length;
+                const upcoming = allEvents.filter(e => new Date(e.date) > now).length;
+                const finished = allEvents.filter(e => new Date(e.date) < now && new Date(e.date).toDateString() !== now.toDateString()).length;
+                setStats(prev => ({ ...prev, ongoing, upcoming, finished }));
+            }
+
+            // Faculty manages their own events
+            const myEvents = allEvents.filter(e => e.createdBy === user._id || e.createdBy?._id === user._id);
+            setEvents(myEvents);
+        } catch (error) {
+            console.error("Error fetching events", error);
+        } finally {
+            if (!forStats) setLoading(prev => ({ ...prev, events: false }));
+        }
+    };
+
+    const fetchRequests = async () => {
+        setLoading(prev => ({ ...prev, requests: true }));
+        try {
+            const res = await axiosInstance.get('/event-requests');
+            const allRequests = res.data.data || [];
+            const departmentRequests = allRequests.filter(req => req.branch === user.branch);
+            setRequests(departmentRequests);
+        } catch (error) {
+            console.error("Error fetching requests", error);
+        } finally {
+            setLoading(prev => ({ ...prev, requests: false }));
+        }
+    };
+
+    const fetchRecruitments = async () => {
+        setLoading(prev => ({ ...prev, recruitments: true }));
+        try {
+            const res = await axiosInstance.get('/recruitments?status=all');
+            const allRecruitments = res.data.data || [];
+            const myRecruitments = allRecruitments.filter(r => r.createdBy._id === user._id || r.createdBy === user._id);
+            setRecruitments(myRecruitments);
+        } catch (error) {
+            console.error("Error fetching recruitments", error);
+        } finally {
+            setLoading(prev => ({ ...prev, recruitments: false }));
+        }
+    };
+
+    const fetchStudents = async (forStats = false) => {
+        if (!forStats) setLoading(prev => ({ ...prev, students: true }));
+        try {
+            const res = await axiosInstance.get('/users/students');
+            const studentList = res.data.data || [];
+            setStudents(studentList);
+            if (activeRoute === 'Dashboard' || forStats) {
+                setStats(prev => ({ ...prev, students: studentList.length }));
+            }
+        } catch (error) {
+            console.error("Error fetching students", error);
+        } finally {
+            if (!forStats) setLoading(prev => ({ ...prev, students: false }));
+        }
+    };
+
+    const fetchAnnouncements = async () => {
+        setLoading(prev => ({ ...prev, announcements: true }));
+        try {
+            const res = await axiosInstance.get('/announcements');
+            const allAnnouncements = res.data.data || [];
+            setAnnouncements(allAnnouncements);
+        } catch (error) {
+            console.error("Error fetching announcements", error);
+        } finally {
+            setLoading(prev => ({ ...prev, announcements: false }));
+        }
+    };
+
+    const fetchApplicants = async (recruitmentId) => {
+        setLoading(prev => ({ ...prev, applicants: true }));
+        try {
+            const res = await axiosInstance.get(`/recruitments/${recruitmentId}/applicants`);
+            setSelectedItem({ ...selectedItem, applicants: res.data.data.applicants, recruitmentId });
+            setShowApplicantsModal(true);
+        } catch (error) {
+            console.error("Error fetching applicants", error);
+            alert("Failed to fetch applicants");
+        } finally {
+            setLoading(prev => ({ ...prev, applicants: false }));
+        }
+    };
+
+    // CRUD Handlers
+    const handleCreateEvent = async (e) => {
+        e.preventDefault();
+        try {
+            await axiosInstance.post('/events', eventForm);
+            alert("Event created successfully");
+            setShowEventModal(false);
+            fetchEvents();
+        } catch (error) {
+            console.error("Create event failed", error);
+            alert("Failed to create event");
+        }
+    };
+
+    const handleUpdateEvent = async (e) => {
+        e.preventDefault();
+        try {
+            await axiosInstance.put(`/events/${selectedItem._id}`, eventForm);
+            alert("Event updated successfully");
+            setShowEventModal(false);
+            setSelectedItem(null);
+            fetchEvents();
+        } catch (error) {
+            console.error("Update event failed", error);
+            alert("Failed to update event");
+        }
+    };
+
+    const handleDeleteEvent = async (id) => {
+        if (!window.confirm("Are you sure you want to delete this event?")) return;
+        try {
+            await axiosInstance.delete(`/events/${id}`);
+            alert("Event deleted successfully");
+            fetchEvents();
+        } catch (error) {
+            console.error("Delete event failed", error);
+            alert("Failed to delete event");
+        }
+    };
+
+    const handleApproveRequest = async (id) => {
+        try {
+            await axiosInstance.patch(`/event-requests/${id}/approve`);
+            alert("Request approved");
+            fetchRequests();
+        } catch (error) {
+            console.error("Approve request failed", error);
+            alert("Failed to approve request");
+        }
+    };
+
+    const handleRejectRequest = async (id) => {
+        if (!window.confirm("Reject this request?")) return;
+        try {
+            await axiosInstance.patch(`/event-requests/${id}/reject`);
+            alert("Request rejected");
+            fetchRequests();
+        } catch (error) {
+            console.error("Reject request failed", error);
+            alert("Failed to reject request");
+        }
+    };
+
+    const handleCreateRecruitment = async (e) => {
+        e.preventDefault();
+        try {
+            await axiosInstance.post('/recruitments', recruitmentForm);
+            alert("Recruitment posted");
+            setShowRecruitmentModal(false);
+            fetchRecruitments();
+        } catch (error) {
+            console.error("Create recruitment failed", error);
+            alert("Failed to post recruitment");
+        }
+    };
+
+    const handleUpdateRecruitment = async (e) => {
+        e.preventDefault();
+        try {
+            await axiosInstance.put(`/recruitments/${selectedItem._id}`, recruitmentForm);
+            alert("Recruitment updated");
+            setShowRecruitmentModal(false);
+            setSelectedItem(null);
+            fetchRecruitments();
+        } catch (error) {
+            console.error("Update recruitment failed", error);
+            alert("Failed to update recruitment");
+        }
+    };
+
+    const handleDeleteRecruitment = async (id) => {
+        if (!window.confirm("Delete this recruitment?")) return;
+        try {
+            await axiosInstance.delete(`/recruitments/${id}`);
+            alert("Recruitment deleted");
+            fetchRecruitments();
+        } catch (error) {
+            console.error("Delete recruitment failed", error);
+            alert("Failed to delete recruitment");
+        }
+    };
+
+    const handleCreateAnnouncement = async (e) => {
+        e.preventDefault();
+        try {
+            await axiosInstance.post('/announcements', announcementForm);
+            alert("Announcement posted");
+            setShowAnnouncementModal(false);
+            fetchAnnouncements();
+        } catch (error) {
+            console.error("Create announcement failed", error);
+            alert("Failed to post announcement");
+        }
+    };
+
+    const handleDeleteAnnouncement = async (id) => {
+        if (!window.confirm("Delete this announcement?")) return;
+        try {
+            await axiosInstance.delete(`/announcements/${id}`);
+            alert("Announcement deleted");
+            fetchAnnouncements();
+        } catch (error) {
+            console.error("Delete announcement failed", error);
+            alert("Failed to delete announcement");
+        }
+    };
+
+    // Handlers
+    const handleLogout = () => {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+    };
+
+    const getGreeting = () => {
+        const hour = currentTime.getHours();
+        if (hour < 12) return 'Good Morning';
+        if (hour < 17) return 'Good Afternoon';
+        return 'Good Evening';
+    };
+
+    // Sub-renderers
+    const renderStats = () => (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <StatsCard icon={Calendar} label="Ongoing Events" count={stats.ongoing} color="blue" />
+            <StatsCard icon={Calendar} label="Upcoming Events" count={stats.upcoming} color="indigo" />
+            <StatsCard icon={CheckCircle} label="Finished Events" count={stats.finished} color="emerald" />
+            <StatsCard icon={Users} label="Total Students" count={stats.students} color="amber" />
+        </div>
+    );
+
+    // UI Helpers for Data Displays
+    const formatDate = (dateString) => new Date(dateString).toLocaleDateString();
+
+    const navigation = [
+        { name: 'Dashboard', icon: UserCheck },
+        { name: 'Events', icon: Calendar },
+        { name: 'Event Requests', icon: Award },
+        { name: 'Recruitment', icon: UserPlus },
+        { name: 'Students', icon: Users },
+        { name: 'Announcements', icon: Bell },
+        { name: 'Gallery', icon: Image }
+    ];
+
+    if (!user) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+
+    return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 font-sans">
+            {/* Sidebar */}
+            <aside className={`fixed left-0 top-0 h-screen bg-slate-900 text-white transition-all duration-300 z-50 ${sidebarCollapsed ? 'w-20' : 'w-64'} shadow-2xl`}>
+                <div className="flex flex-col h-full">
+                    <div className="p-6 border-b border-slate-700/50 flex items-center gap-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center font-bold text-lg">GP</div>
+                        {!sidebarCollapsed && <span className="font-bold text-lg">CAMPUS PULSE</span>}
+                    </div>
+
+                    <nav className="flex-1 py-6 px-3 space-y-1">
+                        {navigation.map((item) => {
+                            const Icon = item.icon;
+                            return (
+                                <button
+                                    key={item.name}
+                                    onClick={() => setActiveRoute(item.name)}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeRoute === item.name ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:bg-slate-800'}`}
+                                >
+                                    <Icon size={20} />
+                                    {!sidebarCollapsed && <span>{item.name}</span>}
+                                </button>
+                            )
+                        })}
+                    </nav>
+
+                    <div className="p-4 border-t border-slate-700/50">
+                        <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-xl">
+                            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold">
+                                {user.name.charAt(0)}
+                            </div>
+                            {!sidebarCollapsed && (
+                                <div className="overflow-hidden">
+                                    <p className="text-sm font-semibold truncate">{user.name}</p>
+                                    <p className="text-xs text-slate-400 capitalize">{user.role}</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="absolute -right-3 top-8 w-6 h-6 bg-slate-800 rounded-full flex items-center justify-center border border-slate-700">
+                        <ChevronRight size={14} className={sidebarCollapsed ? '' : 'rotate-180'} />
+                    </button>
+                </div>
+            </aside>
+
+            {/* Main Content */}
+            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
+                {/* Header */}
+                <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200 px-8 py-4 flex items-center justify-between">
+                    <div>
+                        <h1 className="text-2xl font-bold text-slate-900">{getGreeting()}, <span className="text-blue-600">{user.name.split(' ')[0]}</span></h1>
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <div className="relative">
+                            <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">
+                                {user.name.charAt(0)}
+                            </button>
+                            {/* Profile Dropdown */}
+                            {showProfileMenu && (
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 animate-fadeIn">
+                                    <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-red-600 flex items-center gap-2">
+                                        <LogOut size={16} /> Logout
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </header>
+
+                <div className="p-8">
+                    {/* Dashboard Overview */}
+                    {activeRoute === 'Dashboard' && (
+                        <div className="animate-fadeIn">
+                            {renderStats()}
+                            <h2 className="text-xl font-bold mb-4 text-slate-800">Quick Actions</h2>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <QuickActionCard title="Create Event" icon={Plus} onClick={() => { setActiveRoute('Events'); setEventForm({ title: '', description: '', date: '', venue: '', branch: user.branch }); setShowEventModal(true); }} />
+                                <QuickActionCard title="Post Update" icon={Bell} onClick={() => { setActiveRoute('Announcements'); setAnnouncementForm({ title: '', message: '', branch: user.branch }); setShowAnnouncementModal(true); }} />
+                                <QuickActionCard title="Review Applicants" icon={UserCheck} onClick={() => setActiveRoute('Recruitment')} />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Events Management */}
+                    {activeRoute === 'Events' && (
+                        <div className="animate-fadeIn">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-2xl font-bold text-slate-800">Manage Events</h2>
+                                <button onClick={() => { setEventForm({ title: '', description: '', date: '', venue: '', branch: user.branch }); setSelectedItem(null); setShowEventModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors">
+                                    <Plus size={18} /> Create Event
+                                </button>
+                            </div>
+                            {loading.events ? <Loader /> : (
+                                <div className="grid gap-4">
+                                    {events.map(event => (
+                                        <div key={event._id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+                                            <div>
+                                                <h3 className="font-bold text-lg text-slate-900">{event.title}</h3>
+                                                <p className="text-slate-600 text-sm">{event.description}</p>
+                                                <div className="flex gap-4 mt-2 text-xs text-slate-500">
+                                                    <span className="flex items-center gap-1"><Calendar size={14} /> {formatDate(event.date)}</span>
+                                                    <span className="flex items-center gap-1"><Users size={14} /> {event.branch}</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => { setSelectedItem(event); setEventForm(event); setShowEventModal(true); }} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg"><Edit size={18} /></button>
+                                                <button onClick={() => handleDeleteEvent(event._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash size={18} /></button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {events.length === 0 && <EmptyState message="No events created yet" />}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Event Requests */}
+                    {activeRoute === 'Event Requests' && (
+                        <div className="animate-fadeIn">
+                            <h2 className="text-2xl font-bold mb-6 text-slate-800">Student Event Requests</h2>
+                            {loading.requests ? <Loader /> : (
+                                <div className="grid gap-4">
+                                    {requests.map(req => (
+                                        <div key={req._id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <div className="flex items-center gap-2">
+                                                        <h3 className="font-bold text-lg text-slate-900">{req.title}</h3>
+                                                        <span className={`px-2 py-0.5 text-xs rounded-full font-bold ${req.status === 'pending' ? 'bg-amber-100 text-amber-700' : req.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                            {req.status?.toUpperCase()}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-slate-600 mt-1">{req.description}</p>
+                                                    <p className="text-xs text-slate-500 mt-2">Requested by: {req.requestedBy?.name} ({req.branch})</p>
+                                                </div>
+                                                {req.status === 'pending' && (
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => handleApproveRequest(req._id)} className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600">Approve</button>
+                                                        <button onClick={() => handleRejectRequest(req._id)} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600">Reject</button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {requests.length === 0 && <EmptyState message="No pending requests" />}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Recruitment */}
+                    {activeRoute === 'Recruitment' && (
+                        <div className="animate-fadeIn">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-2xl font-bold text-slate-800">Recruitments</h2>
+                                <button onClick={() => { setRecruitmentForm({ title: '', roleType: '', description: '', branch: user.branch, eventId: '' }); setSelectedItem(null); setShowRecruitmentModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors">
+                                    <Plus size={18} /> New Post
+                                </button>
+                            </div>
+                            {loading.recruitments ? <Loader /> : (
+                                <div className="grid gap-4">
+                                    {recruitments.map(rec => (
+                                        <div key={rec._id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h3 className="font-bold text-lg text-slate-900">{rec.title}</h3>
+                                                    <p className="text-sm text-blue-600 font-medium mb-1">{rec.roleType} • {rec.event?.title}</p>
+                                                    <p className="text-slate-600 text-sm">{rec.description}</p>
+                                                    <div className="mt-3 flex items-center gap-3">
+                                                        <button onClick={() => fetchApplicants(rec._id)} className="text-sm text-blue-600 hover:underline flex items-center gap-1"><Users size={14} /> View Applicants ({rec.applicants?.length || 0})</button>
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${rec.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>{rec.status}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => { setSelectedItem(rec); setRecruitmentForm(rec); setShowRecruitmentModal(true); }} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg"><Edit size={18} /></button>
+                                                    <button onClick={() => handleDeleteRecruitment(rec._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash size={18} /></button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {recruitments.length === 0 && <EmptyState message="No recruitment posts" />}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Students */}
+                    {activeRoute === 'Students' && (
+                        <div className="animate-fadeIn">
+                            <h2 className="text-2xl font-bold mb-6 text-slate-800">Students ({user.branch})</h2>
+                            {loading.students ? <Loader /> : (
+                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50 border-b border-slate-200">
+                                            <tr>
+                                                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Name</th>
+                                                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Email</th>
+                                                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100">
+                                            {students.map(student => (
+                                                <tr key={student._id} className="hover:bg-slate-50">
+                                                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{student.name}</td>
+                                                    <td className="px-6 py-4 text-sm text-slate-600">{student.email}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="px-2 py-1 text-xs font-bold bg-green-100 text-green-700 rounded-full">Active</span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {students.length === 0 && (
+                                                <tr><td colSpan="3" className="px-6 py-8 text-center text-slate-500">No students found</td></tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Announcements */}
+                    {activeRoute === 'Announcements' && (
+                        <div className="animate-fadeIn">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-2xl font-bold text-slate-800">Announcements</h2>
+                                <button onClick={() => { setAnnouncementForm({ title: '', message: '', branch: user.branch }); setShowAnnouncementModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors">
+                                    <Plus size={18} /> New Announcement
+                                </button>
+                            </div>
+                            {loading.announcements ? <Loader /> : (
+                                <div className="space-y-4">
+                                    {announcements.map(ann => (
+                                        <div key={ann._id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                                            <div className="flex justify-between items-start">
+                                                <div>
+                                                    <h3 className="font-bold text-lg text-slate-900">{ann.title}</h3>
+                                                    <p className="text-slate-600 mt-1">{ann.message}</p>
+                                                    <div className="mt-2 text-xs text-slate-400">
+                                                        Posted on {formatDate(ann.createdAt)} by {ann.createdBy?.name || 'Unknown'}
+                                                    </div>
+                                                </div>
+                                                {(ann.createdBy === user._id || ann.createdBy?._id === user._id) && (
+                                                    <button onClick={() => handleDeleteAnnouncement(ann._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash size={18} /></button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {announcements.length === 0 && <EmptyState message="No announcements" />}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Gallery */}
+                    {activeRoute === 'Gallery' && (
+                        <div className="animate-fadeIn">
+                            <div className="flex justify-between items-center mb-6">
+                                <h2 className="text-2xl font-bold text-slate-800">Gallery</h2>
+                                {/* Placeholder for future upload */}
+                                <button className="bg-slate-100 text-slate-600 px-4 py-2 rounded-lg flex items-center gap-2 cursor-not-allowed opacity-50">
+                                    <Plus size={18} /> Upload Media
+                                </button>
+                            </div>
+                            <EmptyState message="Gallery feature coming soon" />
+                        </div>
+                    )}
+
+                </div>
+            </main>
+
+            {/* --- MODALS --- */}
+
+            {/* Event Modal */}
+            {showEventModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 animate-fadeIn">
+                        <h3 className="text-xl font-bold mb-4">{selectedItem ? 'Edit Event' : 'Create New Event'}</h3>
+                        <form onSubmit={selectedItem ? handleUpdateEvent : handleCreateEvent} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Event Title</label>
+                                <input type="text" required value={eventForm.title} onChange={e => setEventForm({ ...eventForm, title: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                                <textarea required value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows="3"></textarea>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                                    <input type="datetime-local" required value={eventForm.date} onChange={e => setEventForm({ ...eventForm, date: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Venue</label>
+                                    <input type="text" required value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Branch</label>
+                                <input type="text" disabled value={eventForm.branch} className="w-full border border-slate-300 bg-slate-100 rounded-lg px-3 py-2 text-slate-500 cursor-not-allowed" />
+                            </div>
+                            <div className="flex gap-3 mt-6">
+                                <button type="button" onClick={() => setShowEventModal(false)} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
+                                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Event</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Recruitment Modal */}
+            {showRecruitmentModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 animate-fadeIn">
+                        <h3 className="text-xl font-bold mb-4">{selectedItem ? 'Edit Recruitment' : 'New Recruitment'}</h3>
+                        <form onSubmit={selectedItem ? handleUpdateRecruitment : handleCreateRecruitment} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
+                                <input type="text" required value={recruitmentForm.title} onChange={e => setRecruitmentForm({ ...recruitmentForm, title: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Role Type</label>
+                                <select required value={recruitmentForm.roleType} onChange={e => setRecruitmentForm({ ...recruitmentForm, roleType: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                                    <option value="">Select Role</option>
+                                    <option value="Volunteer">Volunteer</option>
+                                    <option value="Coordinator">Coordinator</option>
+                                    <option value="Lead">Lead</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Linked Event</label>
+                                <select required value={recruitmentForm.eventId} onChange={e => setRecruitmentForm({ ...recruitmentForm, eventId: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                                    <option value="">Select Event</option>
+                                    {events.map(e => <option key={e._id} value={e._id}>{e.title}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                                <textarea required value={recruitmentForm.description} onChange={e => setRecruitmentForm({ ...recruitmentForm, description: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows="3"></textarea>
+                            </div>
+                            <div className="flex gap-3 mt-6">
+                                <button type="button" onClick={() => setShowRecruitmentModal(false)} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
+                                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Post</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Announcement Modal */}
+            {showAnnouncementModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 animate-fadeIn">
+                        <h3 className="text-xl font-bold mb-4">New Announcement</h3>
+                        <form onSubmit={handleCreateAnnouncement} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
+                                <input type="text" required value={announcementForm.title} onChange={e => setAnnouncementForm({ ...announcementForm, title: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
+                                <textarea required value={announcementForm.message} onChange={e => setAnnouncementForm({ ...announcementForm, message: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows="4"></textarea>
+                            </div>
+                            <div className="flex gap-3 mt-6">
+                                <button type="button" onClick={() => setShowAnnouncementModal(false)} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
+                                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Post</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Applicants Modal */}
+            {showApplicantsModal && selectedItem && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-3xl p-6 animate-fadeIn max-h-[80vh] overflow-y-auto">
+                        <div className="flex justify-between items-center mb-6">
+                            <h3 className="text-xl font-bold">Applicants</h3>
+                            <button onClick={() => setShowApplicantsModal(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} /></button>
+                        </div>
+
+                        <div className="space-y-4">
+                            {selectedItem.applicants?.map(app => (
+                                <div key={app._id} className="border border-slate-200 rounded-lg p-4 flex justify-between items-start">
+                                    <div>
+                                        <p className="font-bold text-slate-900">{app.student?.name || 'Unknown Student'}</p>
+                                        <p className="text-sm text-slate-600">{app.student?.email}</p>
+                                        <div className="mt-2 bg-slate-50 p-2 rounded text-sm text-slate-700">{app.note || 'No cover note'}</div>
+                                    </div>
+                                    <div className="text-right">
+                                        <span className={`px-2 py-1 text-xs font-bold rounded-full ${app.status === 'selected' ? 'bg-green-100 text-green-700' : app.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                                            {app.status}
+                                        </span>
+                                        {/* Faculty could have buttons here to accept/reject applicant if backend supported it in this view */}
+                                    </div>
+                                </div>
+                            ))}
+                            {(!selectedItem.applicants || selectedItem.applicants.length === 0) && (
+                                <p className="text-center text-slate-500 py-8">No applicants yet.</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <style jsx>{`
+                @keyframes fadeIn {
+                    from { opacity: 0; transform: translateY(-10px); }
+                    to { opacity: 1; transform: translateY(0); }
+                }
+                .animate-fadeIn {
+                    animation: fadeIn 0.2s ease-out;
+                }
+            `}</style>
+        </div>
+    );
+};
+
+// Helper Components
+const StatsCard = ({ icon: Icon, label, count, color }) => (
+    <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-${color}-500`}>
+        <div className="flex justify-between items-start">
+            <div>
+                <p className="text-slate-500 text-sm font-medium">{label}</p>
+                <h3 className="text-2xl font-bold mt-1">{count}</h3>
+            </div>
+            <div className={`p-2 bg-${color}-50 text-${color}-600 rounded-lg`}>
+                <Icon size={20} />
+            </div>
+        </div>
+    </div>
+);
+
+const QuickActionCard = ({ title, icon: Icon, onClick }) => (
+    <button onClick={onClick} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all flex items-center gap-4 text-left">
+        <div className="bg-blue-50 p-3 rounded-xl text-blue-600">
+            <Icon size={24} />
+        </div>
+        <span className="font-semibold text-slate-700">{title}</span>
+    </button>
+);
+
+const EmptyState = ({ message }) => (
+    <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-300">
+        <p className="text-slate-400">{message}</p>
+    </div>
+);
+
+const Loader = () => <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>;
+
+export default FacultyDashboard;
