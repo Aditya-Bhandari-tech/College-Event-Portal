@@ -1,16 +1,19 @@
 // routes/userRoutes.js
 import express from "express";
-import { authMiddleware } from "../middleware/authMiddleware.js";
+import { authMiddleware, roleMiddleware } from "../middleware/authMiddleware.js";
+import { getMe, getStudentsByBranch } from "../controllers/userController.js";
 
 const router = express.Router();
 
 // GET /api/users/me -> return logged-in user info
-router.get("/me", authMiddleware, (req, res) => {
-  // req.user is set by authMiddleware
-  res.status(200).json({
-    message: "User profile fetched successfully",
-    user: req.user,
-  });
-});
+router.get("/me", authMiddleware, getMe);
+
+// GET /api/users/students -> return students (Faculty restricted to their branch)
+router.get(
+  "/students",
+  authMiddleware,
+  roleMiddleware("faculty", "admin"),
+  getStudentsByBranch
+);
 
 export default router;

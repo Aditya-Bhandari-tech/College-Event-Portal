@@ -125,14 +125,28 @@ export const updateAnnouncement = async (req, res, next) => {
   }
 };
 
-// DELETE ANNOUNCEMENT (ADMIN ONLY)
+// DELETE ANNOUNCEMENT (ADMIN OR FACULTY OWNER)
 export const deleteAnnouncement = async (req, res, next) => {
   try {
-    const announcement = await Announcement.findByIdAndDelete(req.params.id);
+    const announcement = await Announcement.findById(req.params.id);
 
     if (!announcement) {
       return sendError(res, "Announcement not found", 404);
     }
+
+    // Check permissions
+    if (
+      req.user.role !== "admin" &&
+      announcement.createdBy.toString() !== req.user._id.toString()
+    ) {
+      return sendError(
+        res,
+        "You are not authorized to delete this announcement",
+        403
+      );
+    }
+
+    await announcement.deleteOne();
 
     return sendSuccess(
       res,
