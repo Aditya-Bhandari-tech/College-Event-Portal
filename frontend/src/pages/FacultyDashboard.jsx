@@ -369,9 +369,9 @@ const FacultyDashboard = () => {
     if (!user) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 font-sans">
+        <div className="min-h-screen font-sans" style={{ backgroundColor: '#f9f8f6' }}>
             {/* Sidebar */}
-            <aside className={`fixed left-0 top-0 h-screen bg-slate-900 text-white transition-all duration-300 z-50 ${sidebarCollapsed ? 'w-20' : 'w-64'} shadow-2xl`}>
+            <aside className={`fixed left-0 top-0 h-screen bg-gradient-to-b bg-slate-900 text-white transition-all duration-300 z-50 ${sidebarCollapsed ? 'w-20' : 'w-64'} shadow-2xl`}>
                 <div className="flex flex-col h-full">
                     <div className="p-6 border-b border-slate-700/50 flex items-center gap-3">
                         <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center font-bold text-lg">GP</div>
@@ -385,7 +385,7 @@ const FacultyDashboard = () => {
                                 <button
                                     key={item.name}
                                     onClick={() => setActiveRoute(item.name)}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeRoute === item.name ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-300 hover:bg-slate-800'}`}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeRoute === item.name ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-600 hover:bg-slate-800'}`}
                                 >
                                     <Icon size={20} />
                                     {!sidebarCollapsed && <span>{item.name}</span>}
@@ -402,7 +402,7 @@ const FacultyDashboard = () => {
                             {!sidebarCollapsed && (
                                 <div className="overflow-hidden">
                                     <p className="text-sm font-semibold truncate">{user.name}</p>
-                                    <p className="text-xs text-slate-400 capitalize">{user.role}</p>
+                                    <p className="text-xs text-slate-500 capitalize">{user.role}</p>
                                 </div>
                             )}
                         </div>
@@ -428,7 +428,7 @@ const FacultyDashboard = () => {
                             </button>
                             {/* Profile Dropdown */}
                             {showProfileMenu && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-100 py-1 animate-fadeIn">
+                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1 animate-fadeIn">
                                     <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-red-600 flex items-center gap-2">
                                         <LogOut size={16} /> Logout
                                     </button>
@@ -466,7 +466,7 @@ const FacultyDashboard = () => {
                                     {events.map(event => (
                                         <div key={event._id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
                                             <div>
-                                                <h3 className="font-bold text-lg text-slate-900">{event.title}</h3>
+                                                <h3 className="font-bold text-lg text-slate-800">{event.title}</h3>
                                                 <p className="text-slate-600 text-sm">{event.description}</p>
                                                 <div className="flex gap-4 mt-2 text-xs text-slate-500">
                                                     <span className="flex items-center gap-1"><Calendar size={14} /> {formatDate(event.date)}</span>
@@ -496,7 +496,7 @@ const FacultyDashboard = () => {
                                             <div className="flex justify-between items-start">
                                                 <div>
                                                     <div className="flex items-center gap-2">
-                                                        <h3 className="font-bold text-lg text-slate-900">{req.title}</h3>
+                                                        <h3 className="font-bold text-lg text-slate-800">{req.title}</h3>
                                                         <span className={`px-2 py-0.5 text-xs rounded-full font-bold ${req.status === 'pending' ? 'bg-amber-100 text-amber-700' : req.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                                             {req.status?.toUpperCase()}
                                                         </span>
@@ -534,7 +534,7 @@ const FacultyDashboard = () => {
                                         <div key={rec._id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
                                             <div className="flex justify-between items-start">
                                                 <div>
-                                                    <h3 className="font-bold text-lg text-slate-900">{rec.title}</h3>
+                                                    <h3 className="font-bold text-lg text-slate-800">{rec.title}</h3>
                                                     <p className="text-sm text-blue-600 font-medium mb-1">{rec.roleType} • {rec.event?.title}</p>
                                                     <p className="text-slate-600 text-sm">{rec.description}</p>
                                                     <div className="mt-3 flex items-center gap-3">
@@ -604,9 +604,9 @@ const FacultyDashboard = () => {
                                         <div key={ann._id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
                                             <div className="flex justify-between items-start">
                                                 <div>
-                                                    <h3 className="font-bold text-lg text-slate-900">{ann.title}</h3>
+                                                    <h3 className="font-bold text-lg text-slate-800">{ann.title}</h3>
                                                     <p className="text-slate-600 mt-1">{ann.message}</p>
-                                                    <div className="mt-2 text-xs text-slate-400">
+                                                    <div className="mt-2 text-xs text-slate-500">
                                                         Posted on {formatDate(ann.createdAt)} by {ann.createdBy?.name || 'Unknown'}
                                                     </div>
                                                 </div>
@@ -644,7 +644,7 @@ const FacultyDashboard = () => {
             {/* Event Modal */}
             {showEventModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 animate-fadeIn">
+                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 border border-slate-200 shadow-xl animate-fadeIn">
                         <h3 className="text-xl font-bold mb-4">{selectedItem ? 'Edit Event' : 'Create New Event'}</h3>
                         <form onSubmit={selectedItem ? handleUpdateEvent : handleCreateEvent} className="space-y-4">
                             <div>
@@ -681,7 +681,7 @@ const FacultyDashboard = () => {
             {/* Recruitment Modal */}
             {showRecruitmentModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 animate-fadeIn">
+                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 border border-slate-200 shadow-xl animate-fadeIn">
                         <h3 className="text-xl font-bold mb-4">{selectedItem ? 'Edit Recruitment' : 'New Recruitment'}</h3>
                         <form onSubmit={selectedItem ? handleUpdateRecruitment : handleCreateRecruitment} className="space-y-4">
                             <div>
@@ -720,7 +720,7 @@ const FacultyDashboard = () => {
             {/* Announcement Modal */}
             {showAnnouncementModal && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 animate-fadeIn">
+                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 border border-slate-200 shadow-xl animate-fadeIn">
                         <h3 className="text-xl font-bold mb-4">New Announcement</h3>
                         <form onSubmit={handleCreateAnnouncement} className="space-y-4">
                             <div>
@@ -743,7 +743,7 @@ const FacultyDashboard = () => {
             {/* Applicants Modal */}
             {showApplicantsModal && selectedItem && (
                 <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-3xl p-6 animate-fadeIn max-h-[80vh] overflow-y-auto">
+                    <div className="bg-white rounded-2xl w-full max-w-3xl p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[80vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-bold">Applicants</h3>
                             <button onClick={() => setShowApplicantsModal(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} /></button>
@@ -812,7 +812,7 @@ const QuickActionCard = ({ title, icon: Icon, onClick }) => (
 
 const EmptyState = ({ message }) => (
     <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-300">
-        <p className="text-slate-400">{message}</p>
+        <p className="text-slate-500">{message}</p>
     </div>
 );
 
