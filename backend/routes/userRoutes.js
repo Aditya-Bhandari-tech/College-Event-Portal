@@ -1,7 +1,7 @@
 // routes/userRoutes.js
 import express from "express";
 import { authMiddleware } from "../middleware/authMiddleware.js";
-import { uploadProfilePic } from "../controllers/userController.js";
+import { uploadProfilePic, deleteProfilePic } from "../controllers/userController.js";
 import upload from "../middleware/upload.js";
 
 const router = express.Router();
@@ -33,6 +33,17 @@ router.put(
   authMiddleware,
   upload.single("image"),
   uploadProfilePic
+);
+
+/**
+ * @route   DELETE /api/users/profile-pic
+ * @desc    Delete profile picture
+ * @access  Private
+ */
+router.delete(
+  "/profile-pic",
+  authMiddleware,
+  deleteProfilePic
 );
 
 export default router;

@@ -2,6 +2,7 @@
 import Event from "../models/Event.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
 import cloudinary from "../config/cloudinary.js";
+import { isValidObjectId } from "../utils/validateObjectId.js";
 
 // CREATE EVENT (FACULTY / ADMIN)
 export const createEvent = async (req, res, next) => {
@@ -130,6 +131,14 @@ export const deleteEvent = async (req, res, next) => {
 };  
   export const uploadEventGallery = async (req, res) => {
   try {
+    // Validate MongoDB ObjectId
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid event ID format",
+      });
+    }
+
     const event = await Event.findById(req.params.id);
 
     if (!event) {
@@ -139,6 +148,13 @@ export const deleteEvent = async (req, res, next) => {
       });
     }
   
+    // Validate files uploaded
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No files uploaded",
+      });
+    }
     // Ownership validation (faculty restriction)
     if (
       req.user.role === "faculty" &&
@@ -166,7 +182,7 @@ export const deleteEvent = async (req, res, next) => {
     event.images.push(...images);
     await event.save();
 
-    res.status(200).json({
+    res.status(201).json({
       success: true,
       message: "Images uploaded successfully",
       data: event.images,
@@ -183,6 +199,14 @@ export const deleteEvent = async (req, res, next) => {
   export const deleteGalleryImage = async (req, res) => {
   try {
     const { eventId, publicId } = req.params;
+
+    // Validate MongoDB ObjectId
+    if (!isValidObjectId(eventId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid event ID format",
+      });
+    }
 
     const event = await Event.findById(eventId);
 
