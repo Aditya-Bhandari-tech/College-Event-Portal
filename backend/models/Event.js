@@ -28,6 +28,12 @@ const eventSchema = new mongoose.Schema(
       default: "ALL",
     },
 
+    images: [
+  {
+    public_id: String,
+    url: String,
+  },
+],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
