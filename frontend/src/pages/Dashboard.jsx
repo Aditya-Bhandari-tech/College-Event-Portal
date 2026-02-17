@@ -257,7 +257,7 @@ const Dashboard = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 font-sans">
+    <div className="min-h-screen font-sans" style={{ backgroundColor: '#f9f8f6' }}>
       {/* Left Sidebar */}
       <aside className={`fixed left-0 top-0 h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white transition-all duration-300 z-50 ${sidebarCollapsed ? 'w-20' : 'w-64'} shadow-2xl`}>
         <div className="flex flex-col h-full">
@@ -270,7 +270,7 @@ const Dashboard = () => {
               {!sidebarCollapsed && (
                 <div className="flex flex-col">
                   <span className="font-bold text-lg tracking-tight">CAMPUS PULSE</span>
-                  <span className="text-xs text-slate-400 tracking-wider"></span>
+                  <span className="text-xs text-slate-500 tracking-wider"></span>
                 </div>
               )}
             </div>
@@ -280,7 +280,7 @@ const Dashboard = () => {
           <div className="flex-1 overflow-y-auto py-6">
             <div className={`${sidebarCollapsed ? 'px-3' : 'px-4'} mb-4`}>
               {!sidebarCollapsed && (
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Main Menu</span>
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Main Menu</span>
               )}
             </div>
             <nav className={`space-y-1 ${sidebarCollapsed ? 'px-3' : 'px-4'}`}>
@@ -293,7 +293,7 @@ const Dashboard = () => {
                     onClick={() => setActiveRoute(item.name)}
                     className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
                       ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
-                      : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+                      : 'text-slate-600 hover:bg-slate-800/50 hover:text-white'
                       } ${sidebarCollapsed ? 'justify-center' : ''}`}
                   >
                     <Icon size={20} />
@@ -306,7 +306,7 @@ const Dashboard = () => {
             {/* Actions */}
             <div className={`mt-8 ${sidebarCollapsed ? 'px-3' : 'px-4'}`}>
               {!sidebarCollapsed && (
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-4 block">Your Actions</span>
+                <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest mb-4 block">Your Actions</span>
               )}
               <div className="space-y-1">
                 {quickActions.slice(0, 2).map((action) => {
@@ -314,7 +314,7 @@ const Dashboard = () => {
                   return (
                     <button
                       key={action.name}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-slate-300 hover:bg-slate-800/50 hover:text-white ${sidebarCollapsed ? 'justify-center' : ''}`}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-slate-600 hover:bg-slate-800/50 hover:text-white ${sidebarCollapsed ? 'justify-center' : ''}`}
                     >
                       <Icon size={20} />
                       {!sidebarCollapsed && <span className="font-medium">{action.name}</span>}
@@ -334,7 +334,7 @@ const Dashboard = () => {
               {!sidebarCollapsed && (
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm truncate">{user.name}</p>
-                  <p className="text-xs text-slate-400">{user.role}</p>
+                  <p className="text-xs text-slate-500">{user.role}</p>
                 </div>
               )}
             </div>
@@ -344,7 +344,7 @@ const Dashboard = () => {
         {/* Collapse Toggle */}
         <button
           onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className="absolute -right-3 top-8 w-6 h-6 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-all shadow-lg"
+          className="absolute -right-3 top-8 w-6 h-6 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center text-slate-500 hover:text-white hover:bg-slate-700 transition-all shadow-lg"
         >
           <ChevronRight size={14} className={`transition-transform ${sidebarCollapsed ? '' : 'rotate-180'}`} />
         </button>
@@ -366,7 +366,7 @@ const Dashboard = () => {
               <div className="flex items-center gap-4">
                 {/* Search */}
                 <div className="relative hidden md:block">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
                   <input
                     type="text"
                     placeholder="Search events, announcements..."
@@ -395,7 +395,7 @@ const Dashboard = () => {
                       <p className="font-semibold text-sm text-slate-900">{user.name}</p>
                       <p className="text-xs text-blue-600 font-medium">{user.role}</p>
                     </div>
-                    <ChevronRight size={16} className={`text-slate-400 transition-transform hidden lg:block ${showProfileMenu ? 'rotate-90' : ''}`} />
+                    <ChevronRight size={16} className={`text-slate-500 transition-transform hidden lg:block ${showProfileMenu ? 'rotate-90' : ''}`} />
                   </button>
 
                   {showProfileMenu && (
@@ -445,7 +445,7 @@ const Dashboard = () => {
                           </div>
                           <div>
                             <h3 className="font-bold text-slate-900">{request.name}</h3>
-                            <div className="text-sm text-slate-600 space-y-1">
+                            <div className="text-sm text-slate-500 space-y-1">
                               <p className="flex items-center gap-2">
                                 <Users size={14} /> {request.branch}
                               </p>
@@ -530,15 +530,15 @@ const Dashboard = () => {
                           <p className="text-slate-600 mb-4">{liveEvent.description}</p>
                           <div className="space-y-2">
                             <div className="flex items-center gap-2 text-sm text-slate-700">
-                              <Calendar size={16} className="text-slate-400" />
+                              <Calendar size={16} className="text-slate-500" />
                               <span>{liveEvent.date}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-slate-700">
-                              <MapPin size={16} className="text-slate-400" />
+                              <MapPin size={16} className="text-slate-500" />
                               <span>{liveEvent.venue}</span>
                             </div>
                             <div className="flex items-center gap-2 text-sm text-slate-700">
-                              <Users size={16} className="text-slate-400" />
+                              <Users size={16} className="text-slate-500" />
                               <span>{liveEvent.department}</span>
                             </div>
                           </div>
@@ -595,11 +595,11 @@ const Dashboard = () => {
                         <p className="text-sm text-slate-600 mb-3 line-clamp-2">{event.description}</p>
                         <div className="space-y-2 mb-4">
                           <div className="flex items-center gap-2 text-xs text-slate-700">
-                            <Calendar size={14} className="text-slate-400" />
+                            <Calendar size={14} className="text-slate-500" />
                             <span>{event.date}</span>
                           </div>
                           <div className="flex items-center gap-2 text-xs text-slate-700">
-                            <MapPin size={14} className="text-slate-400" />
+                            <MapPin size={14} className="text-slate-500" />
                             <span>{event.venue}</span>
                           </div>
                         </div>
@@ -696,15 +696,15 @@ const Dashboard = () => {
                           </div>
                           <div className="flex items-center gap-4 text-sm text-slate-600">
                             <div className="flex items-center gap-1">
-                              <Calendar size={14} className="text-slate-400" />
+                              <Calendar size={14} className="text-slate-500" />
                               <span>{event.date}</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <Users size={14} className="text-slate-400" />
+                              <Users size={14} className="text-slate-500" />
                               <span>{event.department}</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <Users size={14} className="text-slate-400" />
+                              <Users size={14} className="text-slate-500" />
                               <span>{event.attended} attended</span>
                             </div>
                           </div>
@@ -774,7 +774,7 @@ const Dashboard = () => {
                           <p className="font-semibold text-slate-900 text-sm">{action.name}</p>
                           <p className="text-xs text-slate-600 mt-0.5">{action.subtitle}</p>
                         </div>
-                        <ChevronRight size={16} className="text-slate-400 mt-2 group-hover:text-slate-600 transition-colors" />
+                        <ChevronRight size={16} className="text-slate-500 mt-2 group-hover:text-slate-600 transition-colors" />
                       </button>
                     );
                   })}
@@ -853,7 +853,7 @@ const StatsCard = ({ icon: Icon, label, count, color, iconBg, iconColor }) => {
         <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
           <Icon size={24} className={iconColor} />
         </div>
-        <ChevronRight size={20} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+        <ChevronRight size={20} className="text-slate-500 group-hover:text-slate-600 transition-colors" />
       </div>
       <div>
         <p className="text-slate-600 text-sm font-medium mb-1">{label}</p>
@@ -1275,7 +1275,7 @@ export default Dashboard;
 //     const filteredStudents = getFilteredStudents();
 
 //     return (
-//         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 font-sans">
+//         <div className="min-h-screen font-sans">
 //             {/* Sidebar */}
 //             <aside className={`fixed left-0 top-0 h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white transition-all duration-300 z-50 ${sidebarCollapsed ? 'w-20' : 'w-64'} shadow-2xl`}>
 //                 <div className="flex flex-col h-full">
@@ -1287,7 +1287,7 @@ export default Dashboard;
 //                             {!sidebarCollapsed && (
 //                                 <div className="flex flex-col">
 //                                     <span className="font-bold text-lg tracking-tight">CAMPUS PULSE</span>
-//                                     <span className="text-xs text-slate-400">Faculty Portal</span>
+//                                     <span className="text-xs text-slate-500">Faculty Portal</span>
 //                                 </div>
 //                             )}
 //                         </div>
@@ -1296,7 +1296,7 @@ export default Dashboard;
 //                     <div className="flex-1 overflow-y-auto py-6">
 //                         <div className={`${sidebarCollapsed ? 'px-3' : 'px-4'} mb-4`}>
 //                             {!sidebarCollapsed && (
-//                                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Main Menu</span>
+//                                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Main Menu</span>
 //                             )}
 //                         </div>
 //                         <nav className={`space-y-1 ${sidebarCollapsed ? 'px-3' : 'px-4'}`}>
@@ -1309,7 +1309,7 @@ export default Dashboard;
 //                                         onClick={() => setActiveRoute(item.name)}
 //                                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${isActive
 //                                                 ? 'bg-gradient-to-r from-blue-500 to-indigo-600 text-white shadow-lg shadow-blue-500/30'
-//                                                 : 'text-slate-300 hover:bg-slate-800/50 hover:text-white'
+//                                                 : 'text-slate-600 hover:bg-slate-800/50 hover:text-white'
 //                                             } ${sidebarCollapsed ? 'justify-center' : ''}`}
 //                                     >
 //                                         <Icon size={20} />
@@ -1328,7 +1328,7 @@ export default Dashboard;
 //                             {!sidebarCollapsed && (
 //                                 <div className="flex-1 min-w-0">
 //                                     <p className="font-semibold text-sm truncate">{user.name}</p>
-//                                     <p className="text-xs text-slate-400 capitalize">{user.role}</p>
+//                                     <p className="text-xs text-slate-500 capitalize">{user.role}</p>
 //                                 </div>
 //                             )}
 //                         </div>
@@ -1337,7 +1337,7 @@ export default Dashboard;
 
 //                 <button
 //                     onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-//                     className="absolute -right-3 top-8 w-6 h-6 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-700 transition-all shadow-lg"
+//                     className="absolute -right-3 top-8 w-6 h-6 bg-slate-800 border border-slate-700 rounded-full flex items-center justify-center text-slate-500 hover:text-white hover:bg-slate-700 transition-all shadow-lg"
 //                 >
 //                     <ChevronRight size={14} className={`transition-transform ${sidebarCollapsed ? '' : 'rotate-180'}`} />
 //                 </button>
@@ -1358,7 +1358,7 @@ export default Dashboard;
 
 //                             <div className="flex items-center gap-4">
 //                                 <div className="relative hidden md:block">
-//                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+//                                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
 //                                     <input
 //                                         type="text"
 //                                         placeholder="Search events, students..."
@@ -1389,7 +1389,7 @@ export default Dashboard;
 //                                             <p className="font-semibold text-sm text-slate-900">{user.name}</p>
 //                                             <p className="text-xs text-blue-600 font-medium capitalize">{user.role}</p>
 //                                         </div>
-//                                         <ChevronRight size={16} className={`text-slate-400 transition-transform hidden lg:block ${showProfileMenu ? 'rotate-90' : ''}`} />
+//                                         <ChevronRight size={16} className={`text-slate-500 transition-transform hidden lg:block ${showProfileMenu ? 'rotate-90' : ''}`} />
 //                                     </button>
 
 //                                     {showProfileMenu && (
@@ -1434,7 +1434,7 @@ export default Dashboard;
 //                                             <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
 //                                                 <Calendar size={24} className="text-blue-600" />
 //                                             </div>
-//                                             <ChevronRight size={20} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+//                                             <ChevronRight size={20} className="text-slate-500 group-hover:text-slate-600 transition-colors" />
 //                                         </div>
 //                                         <div>
 //                                             <p className="text-slate-600 text-sm font-medium mb-1">My Events</p>
@@ -1447,7 +1447,7 @@ export default Dashboard;
 //                                             <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
 //                                                 <AlertCircle size={24} className="text-amber-600" />
 //                                             </div>
-//                                             <ChevronRight size={20} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+//                                             <ChevronRight size={20} className="text-slate-500 group-hover:text-slate-600 transition-colors" />
 //                                         </div>
 //                                         <div>
 //                                             <p className="text-slate-600 text-sm font-medium mb-1">Pending Requests</p>
@@ -1460,7 +1460,7 @@ export default Dashboard;
 //                                             <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
 //                                                 <UserCheck size={24} className="text-emerald-600" />
 //                                             </div>
-//                                             <ChevronRight size={20} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+//                                             <ChevronRight size={20} className="text-slate-500 group-hover:text-slate-600 transition-colors" />
 //                                         </div>
 //                                         <div>
 //                                             <p className="text-slate-600 text-sm font-medium mb-1">Active Recruitments</p>
@@ -1473,7 +1473,7 @@ export default Dashboard;
 //                                             <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
 //                                                 <Users size={24} className="text-purple-600" />
 //                                             </div>
-//                                             <ChevronRight size={20} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+//                                             <ChevronRight size={20} className="text-slate-500 group-hover:text-slate-600 transition-colors" />
 //                                         </div>
 //                                         <div>
 //                                             <p className="text-slate-600 text-sm font-medium mb-1">Department Students</p>
@@ -1581,11 +1581,11 @@ export default Dashboard;
 //                                                         <p className="text-sm text-slate-600 mb-3 line-clamp-2">{event.description}</p>
 //                                                         <div className="space-y-2">
 //                                                             <div className="flex items-center gap-2 text-xs text-slate-700">
-//                                                                 <Calendar size={12} className="text-slate-400" />
+//                                                                 <Calendar size={12} className="text-slate-500" />
 //                                                                 <span>{new Date(event.startDate).toLocaleDateString()}</span>
 //                                                             </div>
 //                                                             <div className="flex items-center gap-2 text-xs text-slate-700">
-//                                                                 <MapPin size={12} className="text-slate-400" />
+//                                                                 <MapPin size={12} className="text-slate-500" />
 //                                                                 <span>{event.venue}</span>
 //                                                             </div>
 //                                                         </div>
@@ -1613,7 +1613,7 @@ export default Dashboard;
 //                                                 <p className="font-semibold text-slate-900 text-sm">Create Event</p>
 //                                                 <p className="text-xs text-slate-600 mt-0.5">Organize a new event</p>
 //                                             </div>
-//                                             <ChevronRight size={16} className="text-slate-400 mt-2 group-hover:text-slate-600 transition-colors" />
+//                                             <ChevronRight size={16} className="text-slate-500 mt-2 group-hover:text-slate-600 transition-colors" />
 //                                         </button>
 
 //                                         <button className="w-full flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors text-left group">
@@ -1624,7 +1624,7 @@ export default Dashboard;
 //                                                 <p className="font-semibold text-slate-900 text-sm">Post Announcement</p>
 //                                                 <p className="text-xs text-slate-600 mt-0.5">Share updates</p>
 //                                             </div>
-//                                             <ChevronRight size={16} className="text-slate-400 mt-2 group-hover:text-slate-600 transition-colors" />
+//                                             <ChevronRight size={16} className="text-slate-500 mt-2 group-hover:text-slate-600 transition-colors" />
 //                                         </button>
 
 //                                         <button className="w-full flex items-start gap-3 p-3 rounded-xl hover:bg-slate-50 transition-colors text-left group">
@@ -1635,7 +1635,7 @@ export default Dashboard;
 //                                                 <p className="font-semibold text-slate-900 text-sm">Open Recruitment</p>
 //                                                 <p className="text-xs text-slate-600 mt-0.5">Recruit volunteers</p>
 //                                             </div>
-//                                             <ChevronRight size={16} className="text-slate-400 mt-2 group-hover:text-slate-600 transition-colors" />
+//                                             <ChevronRight size={16} className="text-slate-500 mt-2 group-hover:text-slate-600 transition-colors" />
 //                                         </button>
 //                                     </div>
 //                                 </div>
@@ -1709,11 +1709,11 @@ export default Dashboard;
 //                                                 <p className="text-sm text-slate-600 mb-4 line-clamp-2">{event.description}</p>
 //                                                 <div className="space-y-2 mb-4">
 //                                                     <div className="flex items-center gap-2 text-xs text-slate-700">
-//                                                         <Calendar size={12} className="text-slate-400" />
+//                                                         <Calendar size={12} className="text-slate-500" />
 //                                                         <span>{new Date(event.startDate).toLocaleDateString()}</span>
 //                                                     </div>
 //                                                     <div className="flex items-center gap-2 text-xs text-slate-700">
-//                                                         <MapPin size={12} className="text-slate-400" />
+//                                                         <MapPin size={12} className="text-slate-500" />
 //                                                         <span>{event.venue}</span>
 //                                                     </div>
 //                                                 </div>
@@ -1736,7 +1736,7 @@ export default Dashboard;
 //                                 </div>
 //                             ) : (
 //                                 <div className="text-center py-12">
-//                                     <Calendar className="mx-auto text-slate-300 mb-4" size={48} />
+//                                     <Calendar className="mx-auto text-slate-600 mb-4" size={48} />
 //                                     <p className="text-slate-500">No events found</p>
 //                                     <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
 //                                         Create Your First Event
@@ -1835,7 +1835,7 @@ export default Dashboard;
 //                                 </div>
 //                             ) : (
 //                                 <div className="text-center py-12">
-//                                     <FileText className="mx-auto text-slate-300 mb-4" size={48} />
+//                                     <FileText className="mx-auto text-slate-600 mb-4" size={48} />
 //                                     <p className="text-slate-500">No event requests found</p>
 //                                 </div>
 //                             )}
@@ -1900,7 +1900,7 @@ export default Dashboard;
 //                                 </div>
 //                             ) : (
 //                                 <div className="text-center py-12">
-//                                     <UserCheck className="mx-auto text-slate-300 mb-4" size={48} />
+//                                     <UserCheck className="mx-auto text-slate-600 mb-4" size={48} />
 //                                     <p className="text-slate-500">No recruitments found</p>
 //                                     <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
 //                                         Create First Recruitment
@@ -1916,7 +1916,7 @@ export default Dashboard;
 //                                 <h1 className="text-2xl font-bold text-slate-900">Department Students</h1>
 //                                 <div className="flex items-center gap-3">
 //                                     <div className="relative">
-//                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+//                                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
 //                                         <input
 //                                             type="text"
 //                                             placeholder="Search students..."
@@ -1980,7 +1980,7 @@ export default Dashboard;
 //                                 </div>
 //                             ) : (
 //                                 <div className="text-center py-12">
-//                                     <Users className="mx-auto text-slate-300 mb-4" size={48} />
+//                                     <Users className="mx-auto text-slate-600 mb-4" size={48} />
 //                                     <p className="text-slate-500">No students found</p>
 //                                 </div>
 //                             )}
@@ -2032,7 +2032,7 @@ export default Dashboard;
 //                                 </div>
 //                             ) : (
 //                                 <div className="text-center py-12">
-//                                     <Bell className="mx-auto text-slate-300 mb-4" size={48} />
+//                                     <Bell className="mx-auto text-slate-600 mb-4" size={48} />
 //                                     <p className="text-slate-500">No announcements found</p>
 //                                     <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
 //                                         Create First Announcement
@@ -2066,7 +2066,7 @@ export default Dashboard;
 //                                 </div>
 //                             ) : (
 //                                 <div className="text-center py-12">
-//                                     <Image className="mx-auto text-slate-300 mb-4" size={48} />
+//                                     <Image className="mx-auto text-slate-600 mb-4" size={48} />
 //                                     <p className="text-slate-500">No media found</p>
 //                                     <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
 //                                         Upload First Media
@@ -2214,7 +2214,7 @@ export default Dashboard;
 //                             </div>
 //                         ) : (
 //                             <div className="text-center py-12">
-//                                 <Users className="mx-auto text-slate-300 mb-4" size={48} />
+//                                 <Users className="mx-auto text-slate-600 mb-4" size={48} />
 //                                 <p className="text-slate-500">No applicants yet</p>
 //                             </div>
 //                         )}
@@ -2479,7 +2479,7 @@ export default Dashboard;
 //     // Return your existing student/admin dashboard JSX here
 //     // (Copy the entire return statement from your original Dashboard component)
 //     return (
-//         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 font-sans">
+//         <div className="min-h-screen font-sans">
 //             {/* YOUR EXISTING STUDENT/ADMIN DASHBOARD CODE GOES HERE */}
 //             {/* I'm keeping this minimal since you already have this working */}
 //             <div className="p-8">
@@ -2530,7 +2530,7 @@ export default Dashboard;
 //                 <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
 //                     <Icon size={24} className={iconColor} />
 //                 </div>
-//                 <ChevronRight size={20} className="text-slate-400 group-hover:text-slate-600 transition-colors" />
+//                 <ChevronRight size={20} className="text-slate-500 group-hover:text-slate-600 transition-colors" />
 //             </div>
 //             <div>
 //                 <p className="text-slate-600 text-sm font-medium mb-1">{label}</p>
