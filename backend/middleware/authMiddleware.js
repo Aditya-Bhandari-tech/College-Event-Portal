@@ -4,60 +4,88 @@ import User from "../models/User.js";
 
 /**
  * 🔐 authMiddleware
- * Checks if JWT token is provided and valid.
- * If yes, attaches user to req.user
+ * Verifies JWT and attaches authenticated user to req.user
  */
 export const authMiddleware = async (req, res, next) => {
   try {
+    if (!process.env.JWT_SECRET) {
+      throw new Error("JWT_SECRET not configured");
+    }
+
     const authHeader = req.headers.authorization;
 
-    // Header should be like: "Bearer <token>"
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "No token provided, authorization denied" });
+    if (!authHeader?.startsWith("Bearer ")) {
+      return res.status(401).json({
+        success: false,
+        message: "Authorization token missing",
+      });
     }
 
-    const token = authHeader.split(" ")[1]; // get <token> part
+    const token = authHeader.split(" ")[1];
 
-    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // decoded = { id: user._id, role: user.role, iat, exp }
-    const user = await User.findById(decoded.id).select("-password"); // remove password
-
-    if (!user) {
-      return res.status(401).json({ message: "User not found, authorization denied" });
+    if (!decoded?.id) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token payload",
+      });
     }
 
-    // Attach user to request object
+    const user = await User.findById(decoded.id).select("-password");
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "User no longer exists",
+      });
+    }
+
+    if (!user.isApproved) {
+      return res.status(403).json({
+        success: false,
+        message: "Account not approved",
+      });
+    }
+
     req.user = user;
 
-    next(); // move to next middleware / controller
+    next();
   } catch (error) {
-    console.error("Auth middleware error:", error);
-    return res.status(401).json({ message: "Invalid or expired token" });
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message: "Token expired",
+      });
+    }
+
+    return res.status(401).json({
+      success: false,
+      message: "Invalid token",
+    });
   }
 };
 
-
-
 /**
  * 🧾 roleMiddleware
- * Allows only users with certain roles to access the route.
- * Usage: roleMiddleware("admin"), roleMiddleware("faculty", "admin")
+ * Restricts access based on user role
  */
 export const roleMiddleware = (...allowedRoles) => {
   return (req, res, next) => {
-    // authMiddleware must have run before this
     if (!req.user) {
-      return res.status(401).json({ message: "Not authenticated" });
+      return res.status(401).json({
+        success: false,
+        message: "Not authenticated",
+      });
     }
 
     if (!allowedRoles.includes(req.user.role)) {
-      return res.status(403).json({ message: "Access denied: insufficient permissions" });
+      return res.status(403).json({
+        success: false,
+        message: "Insufficient permissions",
+      });
     }
 
     next();
   };
 };
-
-
