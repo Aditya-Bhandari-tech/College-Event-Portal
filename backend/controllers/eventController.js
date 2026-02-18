@@ -104,21 +104,26 @@ export const updateEvent = async (req, res, next) => {
   }
 };
 
-// DELETE EVENT (ADMIN ONLY)
+// DELETE EVENT (ADMIN OR FACULTY OWNER)
 export const deleteEvent = async (req, res, next) => {
   try {
-    const event = await Event.findByIdAndDelete(req.params.id);
+    const event = await Event.findById(req.params.id);
 
     if (!event) {
       return sendError(res, "Event not found", 404);
     }
 
-    return sendSuccess(
-      res,
-      "Event deleted successfully",
-      null,
-      200
-    );
+    // Check if user is admin OR the creator of the event
+    if (
+      req.user.role !== "admin" &&
+      event.createdBy.toString() !== req.user._id.toString()
+    ) {
+      return sendError(res, "You are not authorized to delete this event", 403);
+    }
+
+    await event.deleteOne();
+
+    return sendSuccess(res, "Event deleted successfully", null, 200);
   } catch (error) {
     console.error("Delete Event Error:", error);
 

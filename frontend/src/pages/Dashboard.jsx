@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import {
   Calendar, Clock, Users, Bell, Search, Grid, Image,
-  FileText, UserPlus, Hand, ChevronRight, MapPin,
-  Menu, X, LogOut, Settings, User, Award, Check, Trash2, Home
+  FileText, UserPlus, Hand, ChevronRight, ChevronLeft, MapPin,
+  Menu, X, LogOut, Settings, User, Award, Check, Trash2, Home, Maximize2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axios';
@@ -99,6 +99,9 @@ const Dashboard = () => {
   const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [pastEvents, setPastEvents] = useState([]);
   const [recentPhotos, setRecentPhotos] = useState([]);
+  const [galleryEvents, setGalleryEvents] = useState([]);
+  const [galleryLoading, setGalleryLoading] = useState(false);
+  const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -125,11 +128,12 @@ const Dashboard = () => {
         setUpcomingEvents(upcoming.slice(0, 3));
         setPastEvents(finished.slice(0, 3));
 
-        setRecentPhotos([
-          'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=200&h=200&fit=crop',
-          'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=200&h=200&fit=crop',
-          'https://images.unsplash.com/photo-1523580494863-6f3031224c94?w=200&h=200&fit=crop'
-        ]);
+        // Extract real photos from events that have gallery images
+        const allPhotos = allEvents
+          .filter(e => e.images && e.images.length > 0)
+          .flatMap(e => e.images.map(img => img.url))
+          .slice(0, 3);
+        setRecentPhotos(allPhotos);
       } catch (err) {
         console.error("Dashboard fetch error:", err);
         setError("Failed to load dashboard data");
@@ -694,7 +698,7 @@ const Dashboard = () => {
 
           {activeRoute === 'Events' && <Events userRole={user.role} />}
           {activeRoute === 'Announcements' && <Announcements />}
-          {activeRoute === 'Gallery' && <EmptyState message="Gallery coming soon!" />}
+          {activeRoute === 'Gallery' && <GalleryView galleryEvents={galleryEvents} galleryLoading={galleryLoading} setGalleryEvents={setGalleryEvents} setGalleryLoading={setGalleryLoading} lightbox={lightbox} setLightbox={setLightbox} axiosInstance={axiosInstance} />}
         </main>
       </div>
 
@@ -727,6 +731,46 @@ const Dashboard = () => {
           }
         }
       `}</style>
+
+      {/* Lightbox Modal */}
+      {lightbox.open && lightbox.images.length > 0 && (
+        <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center" onClick={() => setLightbox({ ...lightbox, open: false })}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, open: false }); }}
+            className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors z-10"
+            aria-label="Close lightbox"
+          >
+            <X size={28} />
+          </button>
+          {lightbox.images.length > 1 && (
+            <>
+              <button
+                onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, index: (lightbox.index - 1 + lightbox.images.length) % lightbox.images.length }); }}
+                className="absolute left-4 text-white/80 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors z-10"
+                aria-label="Previous image"
+              >
+                <ChevronLeft size={32} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, index: (lightbox.index + 1) % lightbox.images.length }); }}
+                className="absolute right-4 text-white/80 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors z-10"
+                aria-label="Next image"
+              >
+                <ChevronRight size={32} />
+              </button>
+            </>
+          )}
+          <img
+            src={lightbox.images[lightbox.index]?.url || lightbox.images[lightbox.index]}
+            alt={`Gallery image ${lightbox.index + 1}`}
+            className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <div className="absolute bottom-6 text-white/60 text-sm">
+            {lightbox.index + 1} / {lightbox.images.length}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -744,6 +788,94 @@ const StatsCard = ({ icon: Icon, label, count, iconBg, iconColor }) => {
         <p className="text-slate-600 text-xs md:text-sm font-medium mb-1">{label}</p>
         <p className="text-2xl md:text-3xl font-bold text-slate-900">{count}</p>
       </div>
+    </div>
+  );
+};
+
+// Gallery View Component
+const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalleryLoading, lightbox, setLightbox, axiosInstance }) => {
+  useEffect(() => {
+    const fetchGallery = async () => {
+      setGalleryLoading(true);
+      try {
+        const res = await axiosInstance.get('/events');
+        const allEvents = res.data.data || [];
+        const withImages = allEvents.filter(e => e.images && e.images.length > 0);
+        setGalleryEvents(withImages);
+      } catch (err) {
+        console.error('Failed to fetch gallery:', err);
+      } finally {
+        setGalleryLoading(false);
+      }
+    };
+    fetchGallery();
+  }, []);
+
+  const openLightbox = (images, index) => {
+    setLightbox({ open: true, images, index });
+  };
+
+  if (galleryLoading) {
+    return (
+      <div className="flex justify-center py-16" role="status">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <span className="sr-only">Loading gallery...</span>
+      </div>
+    );
+  }
+
+  if (galleryEvents.length === 0) {
+    return <EmptyState message="No gallery images yet. Images will appear here once they are uploaded to events." />;
+  }
+
+  return (
+    <div className="space-y-8">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl md:text-2xl font-bold text-slate-900">Event Gallery</h2>
+        <span className="text-sm text-slate-500">
+          {galleryEvents.reduce((sum, e) => sum + e.images.length, 0)} photos across {galleryEvents.length} events
+        </span>
+      </div>
+
+      {galleryEvents.map(event => (
+        <section key={event._id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="p-4 md:p-5 border-b border-slate-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-lg text-slate-900">{event.title}</h3>
+                <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
+                  <span className="flex items-center gap-1"><Calendar size={14} /> {new Date(event.date).toLocaleDateString()}</span>
+                  <span className="flex items-center gap-1"><MapPin size={14} /> {event.venue}</span>
+                </div>
+              </div>
+              <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-semibold rounded-full">
+                {event.images.length} photos
+              </span>
+            </div>
+          </div>
+          <div className="p-3 md:p-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
+              {event.images.map((img, idx) => (
+                <div
+                  key={img.public_id || idx}
+                  className="group aspect-square rounded-xl overflow-hidden cursor-pointer relative"
+                  onClick={() => openLightbox(event.images, idx)}
+                >
+                  <img
+                    src={img.url}
+                    alt={`${event.title} photo ${idx + 1}`}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-center justify-center">
+                    <Maximize2 size={24} className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      ))}
     </div>
   );
 };

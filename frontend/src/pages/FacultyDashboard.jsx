@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
     Calendar, Users, Bell, Search, Image,
     UserPlus, Edit, Trash, Plus, FileText, CheckCircle, XCircle,
-    UserCheck, ChevronRight, Menu, LogOut, Settings, Award, Check, X, Download
+    UserCheck, ChevronRight, ChevronLeft, Menu, LogOut, Settings, Award, Check, X, Download,
+    Upload, Trash2, Maximize2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axios';
@@ -40,7 +41,14 @@ const FacultyDashboard = () => {
     const [showRecruitmentModal, setShowRecruitmentModal] = useState(false);
     const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
     const [showApplicantsModal, setShowApplicantsModal] = useState(false);
+    const [showGalleryUploadModal, setShowGalleryUploadModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null); // For edit/view applicants
+
+    // Gallery
+    const [galleryUploadEventId, setGalleryUploadEventId] = useState('');
+    const [galleryUploadFiles, setGalleryUploadFiles] = useState([]);
+    const [galleryUploading, setGalleryUploading] = useState(false);
+    const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
 
     // Forms
     const [eventForm, setEventForm] = useState({ title: '', description: '', date: '', venue: '', branch: '' });
@@ -54,7 +62,8 @@ const FacultyDashboard = () => {
         recruitments: false,
         students: false,
         announcements: false,
-        applicants: false
+        applicants: false,
+        gallery: false
     });
 
     useEffect(() => {
@@ -102,6 +111,9 @@ const FacultyDashboard = () => {
                 break;
             case 'Announcements':
                 fetchAnnouncements();
+                break;
+            case 'Gallery':
+                fetchGallery();
                 break;
             default:
                 break;
@@ -202,6 +214,70 @@ const FacultyDashboard = () => {
             alert("Failed to fetch applicants");
         } finally {
             setLoading(prev => ({ ...prev, applicants: false }));
+        }
+    };
+
+    // Gallery
+    const fetchGallery = async () => {
+        setLoading(prev => ({ ...prev, gallery: true }));
+        try {
+            const res = await axiosInstance.get('/events');
+            const allEvents = res.data.data || [];
+            // Faculty sees only their own events' images
+            const myEventsWithImages = allEvents
+                .filter(e => (e.createdBy === user._id || e.createdBy?._id === user._id) && e.images && e.images.length > 0);
+            setGalleryItems(myEventsWithImages);
+        } catch (error) {
+            console.error('Error fetching gallery', error);
+        } finally {
+            setLoading(prev => ({ ...prev, gallery: false }));
+        }
+    };
+
+    const handleGalleryUpload = async (e) => {
+        e.preventDefault();
+        if (!galleryUploadEventId || galleryUploadFiles.length === 0) {
+            alert('Please select an event and at least one image.');
+            return;
+        }
+        if (galleryUploadFiles.length > 10) {
+            alert('You can upload a maximum of 10 images at a time.');
+            return;
+        }
+        setGalleryUploading(true);
+        try {
+            const formData = new FormData();
+            galleryUploadFiles.forEach(file => formData.append('images', file));
+            await axiosInstance.post(`/events/${galleryUploadEventId}/gallery`, formData, {
+                headers: { 'Content-Type': 'multipart/form-data' },
+            });
+            alert('Images uploaded successfully!');
+            setShowGalleryUploadModal(false);
+            setGalleryUploadEventId('');
+            setGalleryUploadFiles([]);
+            fetchGallery();
+        } catch (error) {
+            console.error('Gallery upload failed', error);
+            alert(error.response?.data?.message || 'Failed to upload images');
+        } finally {
+            setGalleryUploading(false);
+        }
+    };
+
+    const handleDeleteGalleryImage = async (eventId, publicId) => {
+        if (!window.confirm('Delete this image permanently?')) return;
+        try {
+            await axiosInstance.delete(`/events/${eventId}/gallery/${publicId}`);
+            // Update local state
+            setGalleryItems(prev => prev.map(event => {
+                if (event._id === eventId) {
+                    return { ...event, images: event.images.filter(img => img.public_id !== publicId) };
+                }
+                return event;
+            }).filter(event => event.images.length > 0));
+        } catch (error) {
+            console.error('Delete gallery image failed', error);
+            alert('Failed to delete image');
         }
     };
 
@@ -698,14 +774,72 @@ const FacultyDashboard = () => {
                     {/* Gallery */}
                     {activeRoute === 'Gallery' && (
                         <div className="animate-fadeIn">
-                            <div className="flex justify-between items-center mb-6">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
                                 <h2 className="text-xl md:text-2xl font-bold text-slate-800">Gallery</h2>
-                                {/* Placeholder for future upload */}
-                                <button className="bg-slate-100 text-slate-600 px-4 py-2 rounded-lg flex items-center gap-2 cursor-not-allowed opacity-50">
-                                    <Plus size={18} /> Upload Media
+                                <button
+                                    onClick={() => { fetchEvents(); setGalleryUploadEventId(''); setGalleryUploadFiles([]); setShowGalleryUploadModal(true); }}
+                                    className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm w-full sm:w-auto justify-center"
+                                >
+                                    <Upload size={18} /> Upload Images
                                 </button>
                             </div>
-                            <EmptyState message="Gallery feature coming soon" />
+                            {loading.gallery ? <Loader /> : (
+                                galleryItems.length === 0 ? (
+                                    <EmptyState message="No gallery images yet. Upload photos to your events to see them here." />
+                                ) : (
+                                    <div className="space-y-6">
+                                        {galleryItems.map(event => (
+                                            <section key={event._id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                                <div className="p-4 md:p-5 border-b border-slate-100">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <h3 className="font-bold text-lg text-slate-900">{event.title}</h3>
+                                                            <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
+                                                                <span className="flex items-center gap-1"><Calendar size={14} /> {new Date(event.date).toLocaleDateString()}</span>
+                                                            </div>
+                                                        </div>
+                                                        <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-semibold rounded-full">
+                                                            {event.images.length} photos
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                                <div className="p-3 md:p-4">
+                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
+                                                        {event.images.map((img, idx) => (
+                                                            <div key={img.public_id || idx} className="group aspect-square rounded-xl overflow-hidden relative">
+                                                                <img
+                                                                    src={img.url}
+                                                                    alt={`${event.title} photo ${idx + 1}`}
+                                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300 cursor-pointer"
+                                                                    loading="lazy"
+                                                                    onClick={() => setLightbox({ open: true, images: event.images, index: idx })}
+                                                                />
+                                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 pointer-events-none"></div>
+                                                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); setLightbox({ open: true, images: event.images, index: idx }); }}
+                                                                        className="p-1.5 bg-white/90 rounded-lg text-slate-700 hover:bg-white transition-colors shadow-sm"
+                                                                        aria-label="View full size"
+                                                                    >
+                                                                        <Maximize2 size={14} />
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteGalleryImage(event._id, img.public_id); }}
+                                                                        className="p-1.5 bg-red-500/90 rounded-lg text-white hover:bg-red-600 transition-colors shadow-sm"
+                                                                        aria-label="Delete image"
+                                                                    >
+                                                                        <Trash2 size={14} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </section>
+                                        ))}
+                                    </div>
+                                )
+                            )}
                         </div>
                     )}
 
@@ -841,6 +975,123 @@ const FacultyDashboard = () => {
                                 <p className="text-center text-slate-500 py-8">No applicants yet.</p>
                             )}
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Gallery Upload Modal */}
+            {showGalleryUploadModal && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="gallery-upload-title">
+                    <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                        <h3 id="gallery-upload-title" className="text-lg md:text-xl font-bold mb-4">Upload Gallery Images</h3>
+                        <form onSubmit={handleGalleryUpload} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Select Event</label>
+                                <select
+                                    required
+                                    value={galleryUploadEventId}
+                                    onChange={e => setGalleryUploadEventId(e.target.value)}
+                                    className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                >
+                                    <option value="">Choose an event...</option>
+                                    {events.map(e => <option key={e._id} value={e._id}>{e.title}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-1">Images (max 10)</label>
+                                <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors cursor-pointer"
+                                    onClick={() => document.getElementById('gallery-file-input').click()}
+                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-blue-400', 'bg-blue-50'); }}
+                                    onDragLeave={(e) => { e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50'); }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
+                                        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                                        setGalleryUploadFiles(prev => [...prev, ...files].slice(0, 10));
+                                    }}
+                                >
+                                    <Upload size={32} className="mx-auto text-slate-400 mb-2" />
+                                    <p className="text-sm text-slate-600">Click or drag images here</p>
+                                    <p className="text-xs text-slate-400 mt-1">JPG, PNG up to 10MB each</p>
+                                </div>
+                                <input
+                                    id="gallery-file-input"
+                                    type="file"
+                                    multiple
+                                    accept="image/jpeg,image/png,image/jpg"
+                                    className="hidden"
+                                    onChange={(e) => setGalleryUploadFiles(prev => [...prev, ...Array.from(e.target.files)].slice(0, 10))}
+                                />
+                                {galleryUploadFiles.length > 0 && (
+                                    <div className="mt-3 space-y-2">
+                                        <p className="text-xs text-slate-500 font-medium">{galleryUploadFiles.length} file(s) selected</p>
+                                        <div className="grid grid-cols-5 gap-2">
+                                            {galleryUploadFiles.map((file, i) => (
+                                                <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100">
+                                                    <img src={URL.createObjectURL(file)} alt={file.name} className="w-full h-full object-cover" />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setGalleryUploadFiles(prev => prev.filter((_, idx) => idx !== i))}
+                                                        className="absolute top-0.5 right-0.5 p-0.5 bg-red-500 text-white rounded-full"
+                                                        aria-label={`Remove ${file.name}`}
+                                                    >
+                                                        <X size={12} />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex gap-3 mt-6">
+                                <button type="button" onClick={() => { setShowGalleryUploadModal(false); setGalleryUploadFiles([]); }} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
+                                <button type="submit" disabled={galleryUploading} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                                    {galleryUploading ? (
+                                        <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Uploading...</>
+                                    ) : 'Upload Images'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Lightbox Modal */}
+            {lightbox.open && lightbox.images.length > 0 && (
+                <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center" onClick={() => setLightbox({ ...lightbox, open: false })}>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, open: false }); }}
+                        className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors z-10"
+                        aria-label="Close lightbox"
+                    >
+                        <X size={28} />
+                    </button>
+                    {lightbox.images.length > 1 && (
+                        <>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, index: (lightbox.index - 1 + lightbox.images.length) % lightbox.images.length }); }}
+                                className="absolute left-4 text-white/80 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors z-10"
+                                aria-label="Previous image"
+                            >
+                                <ChevronLeft size={32} />
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, index: (lightbox.index + 1) % lightbox.images.length }); }}
+                                className="absolute right-4 text-white/80 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors z-10"
+                                aria-label="Next image"
+                            >
+                                <ChevronRight size={32} />
+                            </button>
+                        </>
+                    )}
+                    <img
+                        src={lightbox.images[lightbox.index]?.url}
+                        alt={`Gallery image ${lightbox.index + 1}`}
+                        className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    />
+                    <div className="absolute bottom-6 text-white/60 text-sm">
+                        {lightbox.index + 1} / {lightbox.images.length}
                     </div>
                 </div>
             )}

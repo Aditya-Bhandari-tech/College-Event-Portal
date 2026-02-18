@@ -48,4 +48,25 @@ export const eventService = {
     const response = await api.patch(`/event-requests/${requestId}/reject`, { comment });
     return response.data;
   },
+
+  // Upload gallery images to an event
+  uploadGalleryImages: async (eventId, formData) => {
+    const response = await api.post(`/events/${eventId}/gallery`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  },
+
+  // Delete a gallery image from an event
+  deleteGalleryImage: async (eventId, publicId) => {
+    const response = await api.delete(`/events/${eventId}/gallery/${publicId}`);
+    return response.data;
+  },
+
+  // Get all events that have gallery images
+  getEventsWithImages: async () => {
+    const response = await api.get('/events');
+    const events = response.data.data || [];
+    return events.filter(e => e.images && e.images.length > 0);
+  },
 };

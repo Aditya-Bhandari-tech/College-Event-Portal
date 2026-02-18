@@ -1,7 +1,7 @@
 // routes/userRoutes.js
 import express from "express";
-import { authMiddleware } from "../middleware/authMiddleware.js";
-import { uploadProfilePic, deleteProfilePic } from "../controllers/userController.js";
+import { authMiddleware, roleMiddleware } from "../middleware/authMiddleware.js";
+import { getMe, getStudentsByBranch, uploadProfilePic, deleteProfilePic } from "../controllers/userController.js";
 import upload from "../middleware/upload.js";
 
 const router = express.Router();
@@ -11,17 +11,19 @@ const router = express.Router();
  * @desc    Get current logged-in user
  * @access  Private
  */
-router.get("/me", authMiddleware, (req, res) => {
-  const user = req.user.toObject();
+router.get("/me", authMiddleware, getMe);
 
-  // Extra safety layer (even though password is excluded in middleware)
-  delete user.password;
-
-  res.status(200).json({
-    success: true,
-    data: user,
-  });
-});
+/**
+ * @route   GET /api/users/students
+ * @desc    Get students (Faculty restricted to their branch)
+ * @access  Private (faculty, admin)
+ */
+router.get(
+  "/students",
+  authMiddleware,
+  roleMiddleware("faculty", "admin"),
+  getStudentsByBranch
+);
 
 /**
  * @route   PUT /api/users/profile-pic

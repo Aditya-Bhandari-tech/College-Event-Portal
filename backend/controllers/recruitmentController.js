@@ -238,14 +238,28 @@ export const updateRecruitment = async (req, res, next) => {
   }
 };
 
-// DELETE RECRUITMENT (ADMIN ONLY)
+// DELETE RECRUITMENT (ADMIN OR FACULTY OWNER)
 export const deleteRecruitment = async (req, res, next) => {
   try {
-    const recruitment = await Recruitment.findByIdAndDelete(req.params.id);
+    const recruitment = await Recruitment.findById(req.params.id);
 
     if (!recruitment) {
       return sendError(res, "Recruitment not found", 404);
     }
+
+    // Check permissions
+    if (
+      req.user.role !== "admin" &&
+      recruitment.createdBy.toString() !== req.user._id.toString()
+    ) {
+      return sendError(
+        res,
+        "You are not authorized to delete this recruitment",
+        403
+      );
+    }
+
+    await recruitment.deleteOne();
 
     return sendSuccess(
       res,
