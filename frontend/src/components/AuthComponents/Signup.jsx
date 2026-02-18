@@ -18,7 +18,10 @@ const Signup = () => {
     phone: "",
     branch: "",
     role: "",
+    year: "",
   });
+
+  const years = ["First Year", "Second Year", "Third Year"];
 
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
@@ -52,6 +55,12 @@ const Signup = () => {
 
     if (!formData.name || !formData.email || !formData.password || !formData.role || !formData.branch) {
       setError("Please fill in all required fields");
+      setLoading(false);
+      return;
+    }
+
+    if (formData.role === "student" && !formData.year) {
+      setError("Please select your year");
       setLoading(false);
       return;
     }
@@ -158,6 +167,7 @@ const Signup = () => {
         role: roleData.role,
         branch: roleData.branch,
         phone: roleData.phone,
+        year: roleData.year,
         isGoogleAuth: true,
       };
 
@@ -408,6 +418,30 @@ const Signup = () => {
                     {branches.map((branch) => (
                       <option key={branch} value={branch} className="bg-[#0a0a0f]">
                         {branch}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Year (Students Only) */}
+              {formData.role === "student" && (
+                <div>
+                  <label htmlFor="year" className="block text-sm font-medium text-slate-300 mb-2">
+                    Year *
+                  </label>
+                  <select
+                    id="year"
+                    name="year"
+                    required
+                    value={formData.year}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 bg-[#0a0a0f] border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent transition"
+                  >
+                    <option value="" className="bg-[#0a0a0f]">Select your year</option>
+                    {years.map((year) => (
+                      <option key={year} value={year} className="bg-[#0a0a0f]">
+                        {year}
                       </option>
                     ))}
                   </select>
