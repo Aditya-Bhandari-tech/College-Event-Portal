@@ -11,7 +11,7 @@ const NotFound = () => {
   };
 
   return (
-    <div className="not-found-page">
+    <main className="not-found-page" role="main" aria-label="Page not found">
       <div className="container">
         <div className="not-found-content">
           <div className="error-illustration">
@@ -346,7 +346,7 @@ const NotFound = () => {
           }
         }
       `}</style>
-    </div>
+    </main>
   );
 };
 

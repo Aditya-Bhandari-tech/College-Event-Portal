@@ -122,12 +122,12 @@ function Welcome() {
               whileInView="visible"
               viewport={{ once: true }}
               variants={revealContainer}
-              className="flex min-h-screen flex-col items-center justify-center px-6 text-center pt-20"
+              className="flex min-h-screen flex-col items-center justify-center px-4 sm:px-6 text-center pt-16 md:pt-20"
             >
               <div className="max-w-4xl mb-8">
                 {/* Animated Title */}
                 <div className="overflow-hidden mb-6">
-                  <motion.h1 className="text-6xl md:text-7xl font-bold tracking-tight">
+                  <motion.h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight">
                     <span className="inline-block bg-gradient-to-r from-blue-400 via-blue-500 to-purple-600 bg-clip-text text-transparent">
                       {"Campus Pulse".split("").map((char, index) => (
                         <motion.span
@@ -147,14 +147,14 @@ function Welcome() {
                 <div className="overflow-hidden mb-4">
                   <motion.p
                     variants={revealItem}
-                    className="text-2xl md:text-3xl font-semibold text-slate-300"
+                    className="text-xl sm:text-2xl md:text-3xl font-semibold text-slate-300"
                   >
                     The heartbeat of campus life
                   </motion.p>
                 </div>
 
                 {/* Description */}
-                <div className="overflow-hidden mb-12 max-w-2xl mx-auto">
+                <div className="overflow-hidden mb-8 md:mb-12 max-w-2xl mx-auto px-2">
                   <motion.p
                     variants={revealItem}
                     className="text-base md:text-lg text-slate-400 leading-relaxed"
@@ -168,15 +168,16 @@ function Welcome() {
               {/* CTA Buttons */}
               <motion.div
                 variants={itemVariants}
-                className="flex gap-4 mb-16"
+                className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-12 md:mb-16 w-full sm:w-auto px-4 sm:px-0"
               >
                 <motion.button
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => navigate("/signup")}
-                  className="group relative px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl overflow-hidden shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30 transition-shadow"
+                  className="group relative px-6 sm:px-8 py-3.5 sm:py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl overflow-hidden shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30 transition-shadow w-full sm:w-auto"
+                  aria-label="Get started - create your account"
                 >
-                  <span className="relative z-10 flex items-center gap-2">
+                  <span className="relative z-10 flex items-center justify-center gap-2">
                     <Zap className="w-5 h-5" />
                     Get Started
                   </span>
@@ -186,7 +187,8 @@ function Welcome() {
                   whileHover={{ scale: 1.05, y: -2 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={() => navigate("/login")}
-                  className="group relative px-8 py-4 border border-white/10 text-white font-semibold rounded-xl overflow-hidden hover:border-white/20 hover:bg-white/5 transition-all backdrop-blur-sm"
+                  className="group relative px-6 sm:px-8 py-3.5 sm:py-4 border border-white/10 text-white font-semibold rounded-xl overflow-hidden hover:border-white/20 hover:bg-white/5 transition-all backdrop-blur-sm w-full sm:w-auto"
+                  aria-label="Login to your account"
                 >
                   <span className="relative z-10">Login</span>
                 </motion.button>
@@ -195,19 +197,19 @@ function Welcome() {
               {/* Quick Features Grid */}
               <motion.div
                 variants={revealContainer}
-                className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-5xl w-full px-4"
+                className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 max-w-5xl w-full px-2 sm:px-4"
               >
                 {/* Events Card */}
                 <motion.div
                   variants={itemVariants}
                   whileHover={{ y: -8, rotateX: 5, rotateY: 5 }}
-                  className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#1a1a24] p-8 hover:border-blue-500/30 cursor-pointer transition-all"
+                  className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#1a1a24] p-5 sm:p-8 hover:border-blue-500/30 cursor-pointer transition-all"
                 >
                   <div className="relative z-10">
                     <div className="mb-4 inline-flex items-center justify-center w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/20">
                       <Calendar className="w-6 h-6 text-blue-400" />
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-2">Events</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-white mb-2">Events</h3>
                     <p className="text-slate-400 text-sm">
                       Discover and register for campus activities
                     </p>
@@ -218,13 +220,13 @@ function Welcome() {
                 <motion.div
                   variants={itemVariants}
                   whileHover={{ y: -8, rotateX: 5, rotateY: -5 }}
-                  className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#1a1a24] p-8 hover:border-purple-500/30 cursor-pointer transition-all"
+                  className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#1a1a24] p-5 sm:p-8 hover:border-purple-500/30 cursor-pointer transition-all"
                 >
                   <div className="relative z-10">
                     <div className="mb-4 inline-flex items-center justify-center w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20">
                       <Megaphone className="w-6 h-6 text-purple-400" />
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-2">Announcements</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-white mb-2">Announcements</h3>
                     <p className="text-slate-400 text-sm">
                       Stay updated with campus news
                     </p>
@@ -235,13 +237,13 @@ function Welcome() {
                 <motion.div
                   variants={itemVariants}
                   whileHover={{ y: -8, rotateX: 5, rotateY: 5 }}
-                  className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#1a1a24] p-8 hover:border-blue-400/30 cursor-pointer transition-all"
+                  className="group relative overflow-hidden rounded-2xl border border-white/10 bg-[#1a1a24] p-5 sm:p-8 hover:border-blue-400/30 cursor-pointer transition-all"
                 >
                   <div className="relative z-10">
                     <div className="mb-4 inline-flex items-center justify-center w-12 h-12 rounded-lg bg-blue-400/10 border border-blue-400/20">
                       <Bell className="w-6 h-6 text-blue-400" />
                     </div>
-                    <h3 className="text-xl font-bold text-white mb-2">Real-time</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-white mb-2">Real-time</h3>
                     <p className="text-slate-400 text-sm">
                       Instant notifications
                     </p>
@@ -268,37 +270,37 @@ function Welcome() {
               whileInView="visible"
               viewport={{ once: true, margin: "-100px" }}
               variants={revealContainer}
-              className="py-24 px-6 relative"
+              className="py-12 md:py-24 px-4 sm:px-6 relative"
             >
               <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-16">
                   <div className="overflow-hidden mb-4">
-                    <motion.h2 variants={revealItem} className="text-4xl md:text-5xl font-bold">
+                    <motion.h2 variants={revealItem} className="text-3xl sm:text-4xl md:text-5xl font-bold">
                       <span className="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
                         Everything You Need
                       </span>
                     </motion.h2>
                   </div>
                   <div className="overflow-hidden">
-                    <motion.p variants={revealItem} className="text-slate-400 text-lg max-w-2xl mx-auto">
+                    <motion.p variants={revealItem} className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto">
                       A comprehensive platform designed to streamline campus communication
                     </motion.p>
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
                   {/* Event Management */}
                   <motion.div
                     variants={itemVariants}
                     whileHover={{ scale: 1.02 }}
-                    className="relative group rounded-2xl border border-white/10 bg-[#1a1a24] p-8 hover:border-blue-500/30 transition-all"
+                    className="relative group rounded-2xl border border-white/10 bg-[#1a1a24] p-5 sm:p-8 hover:border-blue-500/30 transition-all"
                   >
                     <div className="flex items-start gap-4">
                       <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
                         <Calendar className="w-6 h-6 text-blue-400" />
                       </div>
                       <div>
-                        <h3 className="text-2xl font-bold text-white mb-3">Event Management</h3>
+                        <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">Event Management</h3>
                         <p className="text-slate-400 mb-4">
                           Discover upcoming campus events, workshops, and seminars. Register with a single click.
                         </p>
@@ -324,14 +326,14 @@ function Welcome() {
                   <motion.div
                     variants={itemVariants}
                     whileHover={{ scale: 1.02 }}
-                    className="relative group rounded-2xl border border-white/10 bg-[#1a1a24] p-8 hover:border-purple-500/30 transition-all"
+                    className="relative group rounded-2xl border border-white/10 bg-[#1a1a24] p-5 sm:p-8 hover:border-purple-500/30 transition-all"
                   >
                     <div className="flex items-start gap-4">
                       <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
                         <Megaphone className="w-6 h-6 text-purple-400" />
                       </div>
                       <div>
-                        <h3 className="text-2xl font-bold text-white mb-3">Announcements</h3>
+                        <h3 className="text-xl sm:text-2xl font-bold text-white mb-3">Announcements</h3>
                         <p className="text-slate-400 mb-4">
                           Never miss important campus updates. Get official announcements and news in one feed.
                         </p>
@@ -362,25 +364,25 @@ function Welcome() {
               whileInView="visible"
               viewport={{ once: true }}
               variants={revealContainer}
-              className="py-24 px-6 bg-[#111118] relative"
+              className="py-12 md:py-24 px-4 sm:px-6 bg-[#111118] relative"
             >
               <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-16">
                   <div className="overflow-hidden mb-4">
-                    <motion.h2 variants={revealItem} className="text-4xl md:text-5xl font-bold">
+                    <motion.h2 variants={revealItem} className="text-3xl sm:text-4xl md:text-5xl font-bold">
                       <span className="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
                         How It Works
                       </span>
                     </motion.h2>
                   </div>
                   <div className="overflow-hidden">
-                    <motion.p variants={revealItem} className="text-slate-400 text-lg">
+                    <motion.p variants={revealItem} className="text-slate-400 text-base sm:text-lg">
                       Get started in three simple steps
                     </motion.p>
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-8">
+                <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 md:gap-8">
                   {/* Step 1 */}
                   <motion.div variants={revealItem} className="relative text-center group">
                     <div className="mb-6 inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 text-white text-2xl font-bold shadow-lg shadow-blue-500/30">
@@ -423,29 +425,29 @@ function Welcome() {
               whileInView="visible"
               viewport={{ once: true }}
               variants={revealContainer}
-              className="py-24 px-6 relative"
+              className="py-12 md:py-24 px-4 sm:px-6 relative"
             >
               <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-16">
                   <div className="overflow-hidden mb-4">
-                    <motion.h2 variants={revealItem} className="text-4xl md:text-5xl font-bold">
+                    <motion.h2 variants={revealItem} className="text-3xl sm:text-4xl md:text-5xl font-bold">
                       <span className="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
                         Why Campus Pulse?
                       </span>
                     </motion.h2>
                   </div>
                   <div className="overflow-hidden">
-                    <motion.p variants={revealItem} className="text-slate-400 text-lg">
+                    <motion.p variants={revealItem} className="text-slate-400 text-base sm:text-lg">
                       Built for the modern campus community
                     </motion.p>
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-6">
+                <div className="grid md:grid-cols-2 gap-4 sm:gap-6">
                   <motion.div
                     variants={itemVariants}
                     whileHover={{ scale: 1.02 }}
-                    className="rounded-2xl border border-white/10 bg-[#1a1a24] p-8 hover:border-purple-500/30 transition-all"
+                    className="rounded-2xl border border-white/10 bg-[#1a1a24] p-5 sm:p-8 hover:border-purple-500/30 transition-all"
                   >
                     <div className="flex items-start gap-4">
                       <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
@@ -463,7 +465,7 @@ function Welcome() {
                   <motion.div
                     variants={itemVariants}
                     whileHover={{ scale: 1.02 }}
-                    className="rounded-2xl border border-white/10 bg-[#1a1a24] p-8 hover:border-blue-500/30 transition-all"
+                    className="rounded-2xl border border-white/10 bg-[#1a1a24] p-5 sm:p-8 hover:border-blue-500/30 transition-all"
                   >
                     <div className="flex items-start gap-4">
                       <div className="flex-shrink-0 w-12 h-12 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
@@ -487,29 +489,29 @@ function Welcome() {
               whileInView="visible"
               viewport={{ once: true }}
               variants={revealContainer}
-              className="py-24 px-6 bg-[#111118] relative"
+              className="py-12 md:py-24 px-4 sm:px-6 bg-[#111118] relative"
             >
               <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-16">
                   <div className="overflow-hidden mb-4">
-                    <motion.h2 variants={revealItem} className="text-4xl md:text-5xl font-bold">
+                    <motion.h2 variants={revealItem} className="text-3xl sm:text-4xl md:text-5xl font-bold">
                       <span className="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
                         Built For Everyone
                       </span>
                     </motion.h2>
                   </div>
                   <div className="overflow-hidden">
-                    <motion.p variants={revealItem} className="text-slate-400 text-lg">
+                    <motion.p variants={revealItem} className="text-slate-400 text-base sm:text-lg">
                       Tailored experiences for every member of the campus
                     </motion.p>
                   </div>
                 </div>
 
-                <div className="grid md:grid-cols-3 gap-6">
+                <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
                   <motion.div
                     variants={itemVariants}
                     whileHover={{ y: -8 }}
-                    className="rounded-2xl border border-white/10 bg-[#1a1a24] p-8 text-center hover:border-blue-500/30 transition-all"
+                    className="rounded-2xl border border-white/10 bg-[#1a1a24] p-5 sm:p-8 text-center hover:border-blue-500/30 transition-all"
                   >
                     <div className="mb-4 inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-500/10 border border-blue-500/20">
                       <Users className="w-7 h-7 text-blue-400" />
@@ -523,7 +525,7 @@ function Welcome() {
                   <motion.div
                     variants={itemVariants}
                     whileHover={{ y: -8 }}
-                    className="rounded-2xl border border-white/10 bg-[#1a1a24] p-8 text-center hover:border-purple-500/30 transition-all"
+                    className="rounded-2xl border border-white/10 bg-[#1a1a24] p-5 sm:p-8 text-center hover:border-purple-500/30 transition-all"
                   >
                     <div className="mb-4 inline-flex items-center justify-center w-14 h-14 rounded-full bg-purple-500/10 border border-purple-500/20">
                       <UserCheck className="w-7 h-7 text-purple-400" />
@@ -537,7 +539,7 @@ function Welcome() {
                   <motion.div
                     variants={itemVariants}
                     whileHover={{ y: -8 }}
-                    className="rounded-2xl border border-white/10 bg-[#1a1a24] p-8 text-center hover:border-blue-400/30 transition-all"
+                    className="rounded-2xl border border-white/10 bg-[#1a1a24] p-5 sm:p-8 text-center hover:border-blue-400/30 transition-all"
                   >
                     <div className="mb-4 inline-flex items-center justify-center w-14 h-14 rounded-full bg-blue-400/10 border border-blue-400/20">
                       <Shield className="w-7 h-7 text-blue-400" />
@@ -557,18 +559,18 @@ function Welcome() {
               whileInView="visible"
               viewport={{ once: true }}
               variants={revealContainer}
-              className="py-24 px-6 relative"
+              className="py-12 md:py-24 px-4 sm:px-6 relative"
             >
               <div className="max-w-4xl mx-auto text-center">
                 <div className="overflow-hidden mb-6">
-                  <motion.h2 variants={revealItem} className="text-4xl md:text-5xl font-bold">
+                  <motion.h2 variants={revealItem} className="text-3xl sm:text-4xl md:text-5xl font-bold">
                     <span className="bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent">
                       Ready to Get Started?
                     </span>
                   </motion.h2>
                 </div>
                 <div className="overflow-hidden mb-8">
-                  <motion.p variants={revealItem} className="text-slate-400 text-lg max-w-2xl mx-auto">
+                  <motion.p variants={revealItem} className="text-slate-400 text-base sm:text-lg max-w-2xl mx-auto">
                     Join thousands of students, faculty, and staff using Campus Pulse to stay connected.
                   </motion.p>
                 </div>
@@ -578,7 +580,8 @@ function Welcome() {
                     whileHover={{ scale: 1.05, y: -2 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => navigate("/signup")}
-                    className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30 transition-shadow"
+                    className="px-6 sm:px-8 py-3.5 sm:py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/20 hover:shadow-xl hover:shadow-blue-500/30 transition-shadow"
+                    aria-label="Join Campus Pulse"
                   >
                     <span className="flex items-center gap-2">
                       Join Campus Pulse
@@ -590,14 +593,14 @@ function Welcome() {
             </motion.section>
 
             {/* Footer */}
-            <footer className="border-t border-white/10 py-8 px-6 bg-[#111118] relative z-20">
+            <footer className="border-t border-white/10 py-6 sm:py-8 px-4 sm:px-6 bg-[#111118] relative z-20" role="contentinfo">
               <div className="max-w-6xl mx-auto">
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-400">
                   <div className="flex items-center gap-2">
                     <span className="text-blue-400 font-bold text-lg">Campus Pulse</span>
                     <span>© 2024 All rights reserved</span>
                   </div>
-                  <div className="flex gap-6">
+                  <div className="flex flex-wrap gap-4 sm:gap-6">
                     <button className="hover:text-blue-400 transition-colors">About</button>
                     <button className="hover:text-blue-400 transition-colors">Contact</button>
                     <button className="hover:text-blue-400 transition-colors">Privacy</button>
