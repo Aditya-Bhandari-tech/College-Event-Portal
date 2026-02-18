@@ -6,12 +6,16 @@ import {
   getEventById,
   updateEvent,
   deleteEvent,
+  uploadEventGallery,
+  deleteGalleryImage
 } from "../controllers/eventController.js";
 
 import {
   authMiddleware,
   roleMiddleware,
 } from "../middleware/authMiddleware.js";
+
+import galleryUpload from "../middleware/galleryUpload.js";
 
 const router = express.Router();
 
@@ -39,6 +43,21 @@ router.delete(
   authMiddleware,
   roleMiddleware("admin", "faculty"),
   deleteEvent
+);
+
+router.post(
+  "/:id/gallery",
+  authMiddleware,
+  roleMiddleware("faculty", "admin"),
+  galleryUpload.array("images", 10),
+  uploadEventGallery
+);
+
+router.delete(
+  "/:eventId/gallery/:publicId",
+  authMiddleware,
+  roleMiddleware("faculty", "admin"),
+  deleteGalleryImage
 );
 
 export default router;

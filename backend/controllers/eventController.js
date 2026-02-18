@@ -1,6 +1,8 @@
 // controllers/eventController.js
 import Event from "../models/Event.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
+import cloudinary from "../config/cloudinary.js";
+import { isValidObjectId } from "../utils/validateObjectId.js";
 
 // CREATE EVENT (FACULTY / ADMIN)
 export const createEvent = async (req, res, next) => {
@@ -130,5 +132,127 @@ export const deleteEvent = async (req, res, next) => {
     }
 
     return next(error);
+  }
+};  
+  export const uploadEventGallery = async (req, res) => {
+  try {
+    // Validate MongoDB ObjectId
+    if (!isValidObjectId(req.params.id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid event ID format",
+      });
+    }
+
+    const event = await Event.findById(req.params.id);
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found",
+      });
+    }
+  
+    // Validate files uploaded
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No files uploaded",
+      });
+    }
+    // Ownership validation (faculty restriction)
+    if (
+      req.user.role === "faculty" &&
+      event.createdBy.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized to modify this event",
+      });
+    }
+
+    // Limit total gallery size
+    if (event.images.length + req.files.length > 30) {
+      return res.status(400).json({
+        success: false,
+        message: "Gallery image limit exceeded (max 30)",
+      });
+    }
+
+    const images = req.files.map(file => ({
+      public_id: file.filename,
+      url: file.path,
+    }));
+
+    event.images.push(...images);
+    await event.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Images uploaded successfully",
+      data: event.images,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+  };
+
+  export const deleteGalleryImage = async (req, res) => {
+  try {
+    const { eventId, publicId } = req.params;
+
+    // Validate MongoDB ObjectId
+    if (!isValidObjectId(eventId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid event ID format",
+      });
+    }
+
+    const event = await Event.findById(eventId);
+
+    if (!event) {
+      return res.status(404).json({
+        success: false,
+        message: "Event not found",
+      });
+    }
+
+    // Ownership validation
+    if (
+      req.user.role === "faculty" &&
+      event.createdBy.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Not authorized",
+      });
+    }
+
+    // Remove from Cloudinary
+    await cloudinary.uploader.destroy(publicId);
+
+    // Remove from DB
+    event.images = event.images.filter(
+      img => img.public_id !== publicId
+    );
+
+    await event.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Image deleted successfully",
+      data: event.images,
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };

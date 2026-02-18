@@ -81,3 +81,87 @@ samp {
 .animate-float {
   animation: float 20s ease-in-out infinite;
 }
+
+/* ===== ACCESSIBILITY ===== */
+
+/* Focus-visible outlines for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Remove focus outline for mouse users */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Screen reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Reduced motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-float,
+  .animate-pulse,
+  .animate-spin,
+  .animate-fadeIn {
+    animation: none !important;
+  }
+}
+
+/* Smooth scrolling (respects reduced motion) */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ===== RESPONSIVE UTILITIES ===== */
+
+/* Minimum touch target for interactive elements */
+button,
+a,
+select,
+[role="button"] {
+  min-height: 36px;
+}
+
+@media (pointer: coarse) {
+
+  button,
+  a,
+  select,
+  [role="button"] {
+    min-height: 44px;
+  }
+}
+
+/* Prevent horizontal overflow on mobile */
+html,
+body {
+  overflow-x: hidden;
+}
+
+/* Better text rendering on mobile */
+body {
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+}

@@ -19,8 +19,8 @@ const ConfirmDialog = ({
         <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mb-4">
           <AlertTriangle className="text-red-600" size={24} />
         </div>
-        <p className="text-dark-700 mb-6">{message}</p>
-        <div className="flex gap-3 justify-center">
+        <p className="text-dark-700 mb-6" id="confirm-dialog-message">{message}</p>
+        <div className="flex flex-col-reverse sm:flex-row gap-3 justify-center">
           <Button variant="secondary" onClick={onClose}>
             {cancelText}
           </Button>

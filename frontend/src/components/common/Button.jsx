@@ -32,6 +32,8 @@ const Button = ({
       type={type}
       onClick={onClick}
       disabled={disabled || loading}
+      aria-busy={loading}
+      aria-disabled={disabled || loading}
       className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className} disabled:cursor-not-allowed`}
     >
       {loading ? (
