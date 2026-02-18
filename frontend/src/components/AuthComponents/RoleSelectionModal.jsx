@@ -7,7 +7,10 @@ const RoleSelectionModal = ({ isOpen, onClose, onSubmit, userName }) => {
     role: '',
     branch: '',
     phone: '',
+    year: '',
   });
+
+  const years = ["First Year", "Second Year", "Third Year"];
   const [error, setError] = useState('');
 
   const branches = [
@@ -27,9 +30,14 @@ const RoleSelectionModal = ({ isOpen, onClose, onSubmit, userName }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
+
     if (!formData.role || !formData.branch) {
       setError('Please select both role and branch');
+      return;
+    }
+
+    if (formData.role === 'student' && !formData.year) {
+      setError('Please select your year');
       return;
     }
 
@@ -110,6 +118,30 @@ const RoleSelectionModal = ({ isOpen, onClose, onSubmit, userName }) => {
                 {branches.map((branch) => (
                   <option key={branch} value={branch} className="bg-slate-900">
                     {branch}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Year (Students Only) */}
+          {formData.role === 'student' && (
+            <div>
+              <label htmlFor="year" className="block text-sm font-medium text-slate-300 mb-2">
+                Year *
+              </label>
+              <select
+                id="year"
+                name="year"
+                required
+                value={formData.year}
+                onChange={handleChange}
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-cyan-500/50 focus:border-transparent transition"
+              >
+                <option value="" className="bg-slate-900">Select your year</option>
+                {years.map((year) => (
+                  <option key={year} value={year} className="bg-slate-900">
+                    {year}
                   </option>
                 ))}
               </select>
