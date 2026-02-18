@@ -211,7 +211,7 @@ const Signup = () => {
       </div>
 
       {/* Content */}
-      <main className="relative z-10 flex min-h-screen items-center justify-center px-6 py-12">
+      <main className="relative z-10 flex min-h-screen items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -220,7 +220,7 @@ const Signup = () => {
         >
           {/* Header */}
           <div className="text-center mb-8">
-            <h2 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent mb-2">
+            <h2 className="text-3xl sm:text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-purple-600 bg-clip-text text-transparent mb-2">
               Join Campus Pulse
             </h2>
             <p className="text-slate-400">
@@ -229,13 +229,14 @@ const Signup = () => {
           </div>
 
           {/* Form Card */}
-          <div className="rounded-2xl border border-white/10 bg-[#1a1a24] p-8 shadow-2xl">
+          <div className="rounded-2xl border border-white/10 bg-[#1a1a24] p-5 sm:p-8 shadow-2xl">
             {/* Success Message */}
             {successMessage && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-green-500/10 border border-green-500/30 text-green-400 px-4 py-3 rounded-xl text-sm mb-5"
+                role="status"
               >
                 {successMessage}
               </motion.div>
@@ -247,6 +248,7 @@ const Signup = () => {
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-xl text-sm mb-5"
+                role="alert"
               >
                 {error}
               </motion.div>
@@ -339,7 +341,8 @@ const Signup = () => {
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition p-1"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? (
                       <EyeOff className="w-5 h-5" />

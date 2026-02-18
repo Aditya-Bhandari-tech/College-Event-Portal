@@ -6,6 +6,10 @@ import FacultyDashboard from "./pages/FacultyDashboard";
 
 import Dashboard from "./pages/Dashboard";
 import NotFound from "./pages/NotFound";
+import EventRequests from "./pages/EventRequests";
+import Recruitment from "./pages/Recruitment";
+import Users from "./pages/Users";
+import AdminEventApprovals from "./pages/AdminEventApprovals";
 
 export default function App() {
   return (
@@ -14,14 +18,21 @@ export default function App() {
       <Route path="/signup" element={<Signup />} />
       <Route path="/login" element={<Login />} />
 
-      {/* Admin Dashboard */}
+      {/* Admin & Student Dashboard (Role handled inside Dashboard.jsx) */}
       <Route path="/admin" element={<Dashboard />} />
       <Route path="/student" element={<Dashboard />} />
+
+      {/* Faculty Dashboard */}
       <Route path="/faculty" element={<FacultyDashboard />} />
 
-      {/* Temporary placeholders */}
-      <Route path="/student" element={<div>Student Dashboard</div>} />
-      <Route path="/faculty" element={<div>Faculty Dashboard</div>} />
+      {/* Student Pages */}
+      <Route path="/event-requests" element={<EventRequests />} />
+      <Route path="/recruitment" element={<Recruitment />} />
+
+      {/* Admin Pages */}
+      <Route path="/admin/users" element={<Users />} />
+      <Route path="/admin/events" element={<AdminEventApprovals />} />
+      <Route path="/admin/settings" element={<div className="p-8">Settings Page (Coming Soon)</div>} />
 
       <Route path="*" element={<NotFound />} />
     </Routes>

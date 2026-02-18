@@ -6,11 +6,14 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axios';
+import Loader from '../components/common/Loader';
+import EmptyState from '../components/common/EmptyState';
 
 const FacultyDashboard = () => {
     const navigate = useNavigate();
     const [user, setUser] = useState(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [activeRoute, setActiveRoute] = useState('Dashboard');
     const [searchQuery, setSearchQuery] = useState('');
     const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -344,8 +347,13 @@ const FacultyDashboard = () => {
     };
 
     // Sub-renderers
+    const handleRouteChange = (route) => {
+        setActiveRoute(route);
+        setMobileSidebarOpen(false);
+    };
+
     const renderStats = () => (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6 md:mb-8" role="region" aria-label="Statistics">
             <StatsCard icon={Calendar} label="Ongoing Events" count={stats.ongoing} color="blue" />
             <StatsCard icon={Calendar} label="Upcoming Events" count={stats.upcoming} color="indigo" />
             <StatsCard icon={CheckCircle} label="Finished Events" count={stats.finished} color="emerald" />
@@ -366,40 +374,66 @@ const FacultyDashboard = () => {
         { name: 'Gallery', icon: Image }
     ];
 
-    if (!user) return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+    if (!user) return <div className="min-h-screen flex items-center justify-center" role="status" aria-label="Loading"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div><span className="sr-only">Loading...</span></div>;
 
     return (
         <div className="min-h-screen font-sans" style={{ backgroundColor: '#f9f8f6' }}>
+            {/* Mobile Sidebar Overlay */}
+            {mobileSidebarOpen && (
+                <div
+                    className="fixed inset-0 bg-black/50 z-40 md:hidden"
+                    onClick={() => setMobileSidebarOpen(false)}
+                    aria-hidden="true"
+                />
+            )}
+
             {/* Sidebar */}
-            <aside className={`fixed left-0 top-0 h-screen bg-gradient-to-b bg-slate-900 text-white transition-all duration-300 z-50 ${sidebarCollapsed ? 'w-20' : 'w-64'} shadow-2xl`}>
+            <aside
+                className={`fixed left-0 top-0 h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white transition-all duration-300 z-50 shadow-2xl
+                    ${mobileSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'}
+                    md:translate-x-0 ${sidebarCollapsed ? 'md:w-20' : 'md:w-64'}`}
+                role="navigation"
+                aria-label="Faculty navigation"
+            >
                 <div className="flex flex-col h-full">
-                    <div className="p-6 border-b border-slate-700/50 flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center font-bold text-lg">GP</div>
-                        {!sidebarCollapsed && <span className="font-bold text-lg">CAMPUS PULSE</span>}
+                    <div className="p-4 md:p-6 border-b border-slate-700/50 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center font-bold text-lg flex-shrink-0">GP</div>
+                            {(!sidebarCollapsed || mobileSidebarOpen) && <span className="font-bold text-lg">CAMPUS PULSE</span>}
+                        </div>
+                        <button
+                            onClick={() => setMobileSidebarOpen(false)}
+                            className="md:hidden p-2 hover:bg-slate-700 rounded-lg transition-colors"
+                            aria-label="Close navigation menu"
+                        >
+                            <X size={20} />
+                        </button>
                     </div>
 
-                    <nav className="flex-1 py-6 px-3 space-y-1">
+                    <nav className="flex-1 py-4 md:py-6 px-3 space-y-1 overflow-y-auto">
                         {navigation.map((item) => {
                             const Icon = item.icon;
+                            const isActive = activeRoute === item.name;
                             return (
                                 <button
                                     key={item.name}
-                                    onClick={() => setActiveRoute(item.name)}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${activeRoute === item.name ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-600 hover:bg-slate-800'}`}
+                                    onClick={() => handleRouteChange(item.name)}
+                                    aria-current={isActive ? 'page' : undefined}
+                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${sidebarCollapsed && !mobileSidebarOpen ? 'justify-center' : ''}`}
                                 >
                                     <Icon size={20} />
-                                    {!sidebarCollapsed && <span>{item.name}</span>}
+                                    {(!sidebarCollapsed || mobileSidebarOpen) && <span className="font-medium">{item.name}</span>}
                                 </button>
                             )
                         })}
                     </nav>
 
                     <div className="p-4 border-t border-slate-700/50">
-                        <div className="flex items-center gap-3 p-3 bg-slate-800/50 rounded-xl">
-                            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold">
+                        <div className={`flex items-center gap-3 p-3 bg-slate-800/50 rounded-xl ${sidebarCollapsed && !mobileSidebarOpen ? 'justify-center' : ''}`}>
+                            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
                                 {user.name.charAt(0)}
                             </div>
-                            {!sidebarCollapsed && (
+                            {(!sidebarCollapsed || mobileSidebarOpen) && (
                                 <div className="overflow-hidden">
                                     <p className="text-sm font-semibold truncate">{user.name}</p>
                                     <p className="text-xs text-slate-500 capitalize">{user.role}</p>
@@ -408,46 +442,65 @@ const FacultyDashboard = () => {
                         </div>
                     </div>
 
-                    <button onClick={() => setSidebarCollapsed(!sidebarCollapsed)} className="absolute -right-3 top-8 w-6 h-6 bg-slate-800 rounded-full flex items-center justify-center border border-slate-700">
-                        <ChevronRight size={14} className={sidebarCollapsed ? '' : 'rotate-180'} />
+                    <button
+                        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                        className="hidden md:flex absolute -right-3 top-8 w-6 h-6 bg-slate-800 rounded-full items-center justify-center border border-slate-700 text-slate-500 hover:text-white transition-all"
+                        aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                    >
+                        <ChevronRight size={14} className={`transition-transform ${sidebarCollapsed ? '' : 'rotate-180'}`} />
                     </button>
                 </div>
             </aside>
 
             {/* Main Content */}
-            <main className={`transition-all duration-300 ${sidebarCollapsed ? 'ml-20' : 'ml-64'}`}>
+            <main className={`transition-all duration-300 ml-0 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
                 {/* Header */}
-                <header className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200 px-8 py-4 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-slate-900">{getGreeting()}, <span className="text-blue-600">{user.name.split(' ')[0]}</span></h1>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <div className="relative">
-                            <button onClick={() => setShowProfileMenu(!showProfileMenu)} className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">
-                                {user.name.charAt(0)}
-                            </button>
-                            {/* Profile Dropdown */}
-                            {showProfileMenu && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1 animate-fadeIn">
-                                    <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-red-600 flex items-center gap-2">
-                                        <LogOut size={16} /> Logout
-                                    </button>
-                                </div>
-                            )}
+                <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
+                    <div className="px-4 md:px-8 py-3 md:py-4 flex items-center justify-between gap-4">
+                        {/* Mobile hamburger */}
+                        <button
+                            onClick={() => setMobileSidebarOpen(true)}
+                            className="md:hidden p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                            aria-label="Open navigation menu"
+                        >
+                            <Menu size={24} className="text-slate-700" />
+                        </button>
+                        <div className="hidden sm:block">
+                            <h1 className="text-lg md:text-2xl font-bold text-slate-900">{getGreeting()}, <span className="text-blue-600">{user.name.split(' ')[0]}</span></h1>
+                        </div>
+                        <div className="flex items-center gap-2 md:gap-4 flex-1 sm:flex-none justify-end">
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowProfileMenu(!showProfileMenu)}
+                                    className="w-9 h-9 md:w-10 md:h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm"
+                                    aria-expanded={showProfileMenu}
+                                    aria-haspopup="true"
+                                    aria-label="User menu"
+                                >
+                                    {user.name.charAt(0)}
+                                </button>
+                                {showProfileMenu && (
+                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1 animate-fadeIn" role="menu">
+                                        <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-red-600 flex items-center gap-2" role="menuitem">
+                                            <LogOut size={16} /> Logout
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </header>
 
-                <div className="p-8">
+                <div className="p-4 md:p-6 lg:p-8" id="main-content">
                     {/* Dashboard Overview */}
                     {activeRoute === 'Dashboard' && (
                         <div className="animate-fadeIn">
                             {renderStats()}
-                            <h2 className="text-xl font-bold mb-4 text-slate-800">Quick Actions</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <QuickActionCard title="Create Event" icon={Plus} onClick={() => { setActiveRoute('Events'); setEventForm({ title: '', description: '', date: '', venue: '', branch: user.branch }); setShowEventModal(true); }} />
-                                <QuickActionCard title="Post Update" icon={Bell} onClick={() => { setActiveRoute('Announcements'); setAnnouncementForm({ title: '', message: '', branch: user.branch }); setShowAnnouncementModal(true); }} />
-                                <QuickActionCard title="Review Applicants" icon={UserCheck} onClick={() => setActiveRoute('Recruitment')} />
+                            <h2 className="text-lg md:text-xl font-bold mb-3 md:mb-4 text-slate-800">Quick Actions</h2>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
+                                <QuickActionCard title="Create Event" icon={Plus} onClick={() => { handleRouteChange('Events'); setEventForm({ title: '', description: '', date: '', venue: '', branch: user.branch }); setShowEventModal(true); }} />
+                                <QuickActionCard title="Post Update" icon={Bell} onClick={() => { handleRouteChange('Announcements'); setAnnouncementForm({ title: '', message: '', branch: user.branch }); setShowAnnouncementModal(true); }} />
+                                <QuickActionCard title="Review Applicants" icon={UserCheck} onClick={() => handleRouteChange('Recruitment')} />
                             </div>
                         </div>
                     )}
@@ -455,27 +508,27 @@ const FacultyDashboard = () => {
                     {/* Events Management */}
                     {activeRoute === 'Events' && (
                         <div className="animate-fadeIn">
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-bold text-slate-800">Manage Events</h2>
-                                <button onClick={() => { setEventForm({ title: '', description: '', date: '', venue: '', branch: user.branch }); setSelectedItem(null); setShowEventModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
+                                <h2 className="text-xl md:text-2xl font-bold text-slate-800">Manage Events</h2>
+                                <button onClick={() => { setEventForm({ title: '', description: '', date: '', venue: '', branch: user.branch }); setSelectedItem(null); setShowEventModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm w-full sm:w-auto justify-center">
                                     <Plus size={18} /> Create Event
                                 </button>
                             </div>
                             {loading.events ? <Loader /> : (
                                 <div className="grid gap-4">
                                     {events.map(event => (
-                                        <div key={event._id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
-                                            <div>
-                                                <h3 className="font-bold text-lg text-slate-800">{event.title}</h3>
-                                                <p className="text-slate-600 text-sm">{event.description}</p>
-                                                <div className="flex gap-4 mt-2 text-xs text-slate-500">
+                                        <div key={event._id} className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <h3 className="font-bold text-base md:text-lg text-slate-800">{event.title}</h3>
+                                                <p className="text-slate-600 text-sm line-clamp-2">{event.description}</p>
+                                                <div className="flex flex-wrap gap-3 md:gap-4 mt-2 text-xs text-slate-500">
                                                     <span className="flex items-center gap-1"><Calendar size={14} /> {formatDate(event.date)}</span>
                                                     <span className="flex items-center gap-1"><Users size={14} /> {event.branch}</span>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => { setSelectedItem(event); setEventForm(event); setShowEventModal(true); }} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg"><Edit size={18} /></button>
-                                                <button onClick={() => handleDeleteEvent(event._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash size={18} /></button>
+                                            <div className="flex gap-2 w-full sm:w-auto">
+                                                <button onClick={() => { setSelectedItem(event); setEventForm(event); setShowEventModal(true); }} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg flex-1 sm:flex-none flex items-center justify-center" aria-label={`Edit ${event.title}`}><Edit size={18} /></button>
+                                                <button onClick={() => handleDeleteEvent(event._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg flex-1 sm:flex-none flex items-center justify-center" aria-label={`Delete ${event.title}`}><Trash size={18} /></button>
                                             </div>
                                         </div>
                                     ))}
@@ -488,26 +541,26 @@ const FacultyDashboard = () => {
                     {/* Event Requests */}
                     {activeRoute === 'Event Requests' && (
                         <div className="animate-fadeIn">
-                            <h2 className="text-2xl font-bold mb-6 text-slate-800">Student Event Requests</h2>
+                            <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6 text-slate-800">Student Event Requests</h2>
                             {loading.requests ? <Loader /> : (
                                 <div className="grid gap-4">
                                     {requests.map(req => (
-                                        <div key={req._id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <h3 className="font-bold text-lg text-slate-800">{req.title}</h3>
+                                        <div key={req._id} className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200">
+                                            <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <h3 className="font-bold text-base md:text-lg text-slate-800">{req.title}</h3>
                                                         <span className={`px-2 py-0.5 text-xs rounded-full font-bold ${req.status === 'pending' ? 'bg-amber-100 text-amber-700' : req.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
                                                             {req.status?.toUpperCase()}
                                                         </span>
                                                     </div>
-                                                    <p className="text-slate-600 mt-1">{req.description}</p>
+                                                    <p className="text-slate-600 mt-1 text-sm">{req.description}</p>
                                                     <p className="text-xs text-slate-500 mt-2">Requested by: {req.requestedBy?.name} ({req.branch})</p>
                                                 </div>
                                                 {req.status === 'pending' && (
-                                                    <div className="flex gap-2">
-                                                        <button onClick={() => handleApproveRequest(req._id)} className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600">Approve</button>
-                                                        <button onClick={() => handleRejectRequest(req._id)} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600">Reject</button>
+                                                    <div className="flex gap-2 w-full sm:w-auto">
+                                                        <button onClick={() => handleApproveRequest(req._id)} className="flex-1 sm:flex-none px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600" aria-label={`Approve ${req.title}`}>Approve</button>
+                                                        <button onClick={() => handleRejectRequest(req._id)} className="flex-1 sm:flex-none px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600" aria-label={`Reject ${req.title}`}>Reject</button>
                                                     </div>
                                                 )}
                                             </div>
@@ -522,29 +575,29 @@ const FacultyDashboard = () => {
                     {/* Recruitment */}
                     {activeRoute === 'Recruitment' && (
                         <div className="animate-fadeIn">
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-bold text-slate-800">Recruitments</h2>
-                                <button onClick={() => { setRecruitmentForm({ title: '', roleType: '', description: '', branch: user.branch, eventId: '' }); setSelectedItem(null); setShowRecruitmentModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
+                                <h2 className="text-xl md:text-2xl font-bold text-slate-800">Recruitments</h2>
+                                <button onClick={() => { setRecruitmentForm({ title: '', roleType: '', description: '', branch: user.branch, eventId: '' }); setSelectedItem(null); setShowRecruitmentModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm w-full sm:w-auto justify-center">
                                     <Plus size={18} /> New Post
                                 </button>
                             </div>
                             {loading.recruitments ? <Loader /> : (
                                 <div className="grid gap-4">
                                     {recruitments.map(rec => (
-                                        <div key={rec._id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h3 className="font-bold text-lg text-slate-800">{rec.title}</h3>
+                                        <div key={rec._id} className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200">
+                                            <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <h3 className="font-bold text-base md:text-lg text-slate-800">{rec.title}</h3>
                                                     <p className="text-sm text-blue-600 font-medium mb-1">{rec.roleType} • {rec.event?.title}</p>
                                                     <p className="text-slate-600 text-sm">{rec.description}</p>
-                                                    <div className="mt-3 flex items-center gap-3">
+                                                    <div className="mt-3 flex flex-wrap items-center gap-3">
                                                         <button onClick={() => fetchApplicants(rec._id)} className="text-sm text-blue-600 hover:underline flex items-center gap-1"><Users size={14} /> View Applicants ({rec.applicants?.length || 0})</button>
                                                         <span className={`text-xs px-2 py-0.5 rounded-full ${rec.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>{rec.status}</span>
                                                     </div>
                                                 </div>
-                                                <div className="flex gap-2">
-                                                    <button onClick={() => { setSelectedItem(rec); setRecruitmentForm(rec); setShowRecruitmentModal(true); }} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg"><Edit size={18} /></button>
-                                                    <button onClick={() => handleDeleteRecruitment(rec._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash size={18} /></button>
+                                                <div className="flex gap-2 w-full sm:w-auto">
+                                                    <button onClick={() => { setSelectedItem(rec); setRecruitmentForm(rec); setShowRecruitmentModal(true); }} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg flex-1 sm:flex-none flex items-center justify-center" aria-label={`Edit ${rec.title}`}><Edit size={18} /></button>
+                                                    <button onClick={() => handleDeleteRecruitment(rec._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg flex-1 sm:flex-none flex items-center justify-center" aria-label={`Delete ${rec.title}`}><Trash size={18} /></button>
                                                 </div>
                                             </div>
                                         </div>
@@ -558,33 +611,53 @@ const FacultyDashboard = () => {
                     {/* Students */}
                     {activeRoute === 'Students' && (
                         <div className="animate-fadeIn">
-                            <h2 className="text-2xl font-bold mb-6 text-slate-800">Students ({user.branch})</h2>
+                            <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6 text-slate-800">Students ({user.branch})</h2>
                             {loading.students ? <Loader /> : (
-                                <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                                    <table className="w-full text-left">
-                                        <thead className="bg-slate-50 border-b border-slate-200">
-                                            <tr>
-                                                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Name</th>
-                                                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Email</th>
-                                                <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-100">
-                                            {students.map(student => (
-                                                <tr key={student._id} className="hover:bg-slate-50">
-                                                    <td className="px-6 py-4 text-sm font-medium text-slate-900">{student.name}</td>
-                                                    <td className="px-6 py-4 text-sm text-slate-600">{student.email}</td>
-                                                    <td className="px-6 py-4">
-                                                        <span className="px-2 py-1 text-xs font-bold bg-green-100 text-green-700 rounded-full">Active</span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {students.length === 0 && (
-                                                <tr><td colSpan="3" className="px-6 py-8 text-center text-slate-500">No students found</td></tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                <>
+                                    {/* Desktop table */}
+                                    <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead className="bg-slate-50 border-b border-slate-200">
+                                                    <tr>
+                                                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Name</th>
+                                                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Email</th>
+                                                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-100">
+                                                    {students.map(student => (
+                                                        <tr key={student._id} className="hover:bg-slate-50">
+                                                            <td className="px-6 py-4 text-sm font-medium text-slate-900">{student.name}</td>
+                                                            <td className="px-6 py-4 text-sm text-slate-600">{student.email}</td>
+                                                            <td className="px-6 py-4">
+                                                                <span className="px-2 py-1 text-xs font-bold bg-green-100 text-green-700 rounded-full">Active</span>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                    {students.length === 0 && (
+                                                        <tr><td colSpan="3" className="px-6 py-8 text-center text-slate-500">No students found</td></tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                    {/* Mobile cards */}
+                                    <div className="md:hidden space-y-3">
+                                        {students.map(student => (
+                                            <div key={student._id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="min-w-0">
+                                                        <p className="font-semibold text-slate-900 text-sm">{student.name}</p>
+                                                        <p className="text-xs text-slate-500 truncate">{student.email}</p>
+                                                    </div>
+                                                    <span className="px-2 py-1 text-xs font-bold bg-green-100 text-green-700 rounded-full flex-shrink-0">Active</span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {students.length === 0 && <div className="text-center py-8 text-slate-500 text-sm">No students found</div>}
+                                    </div>
+                                </>
                             )}
                         </div>
                     )}
@@ -592,29 +665,29 @@ const FacultyDashboard = () => {
                     {/* Announcements */}
                     {activeRoute === 'Announcements' && (
                         <div className="animate-fadeIn">
-                            <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-bold text-slate-800">Announcements</h2>
-                                <button onClick={() => { setAnnouncementForm({ title: '', message: '', branch: user.branch }); setShowAnnouncementModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
+                                <h2 className="text-xl md:text-2xl font-bold text-slate-800">Announcements</h2>
+                                <button onClick={() => { setAnnouncementForm({ title: '', message: '', branch: user.branch }); setShowAnnouncementModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm w-full sm:w-auto justify-center">
                                     <Plus size={18} /> New Announcement
                                 </button>
                             </div>
                             {loading.announcements ? <Loader /> : (
                                 <div className="space-y-4">
                                     {announcements.map(ann => (
-                                        <div key={ann._id} className="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <h3 className="font-bold text-lg text-slate-800">{ann.title}</h3>
-                                                    <p className="text-slate-600 mt-1">{ann.message}</p>
+                                        <article key={ann._id} className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200">
+                                            <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                                                <div className="min-w-0 flex-1">
+                                                    <h3 className="font-bold text-base md:text-lg text-slate-800">{ann.title}</h3>
+                                                    <p className="text-slate-600 mt-1 text-sm">{ann.message}</p>
                                                     <div className="mt-2 text-xs text-slate-500">
                                                         Posted on {formatDate(ann.createdAt)} by {ann.createdBy?.name || 'Unknown'}
                                                     </div>
                                                 </div>
                                                 {(ann.createdBy === user._id || ann.createdBy?._id === user._id) && (
-                                                    <button onClick={() => handleDeleteAnnouncement(ann._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg"><Trash size={18} /></button>
+                                                    <button onClick={() => handleDeleteAnnouncement(ann._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg" aria-label={`Delete ${ann.title}`}><Trash size={18} /></button>
                                                 )}
                                             </div>
-                                        </div>
+                                        </article>
                                     ))}
                                     {announcements.length === 0 && <EmptyState message="No announcements" />}
                                 </div>
@@ -626,7 +699,7 @@ const FacultyDashboard = () => {
                     {activeRoute === 'Gallery' && (
                         <div className="animate-fadeIn">
                             <div className="flex justify-between items-center mb-6">
-                                <h2 className="text-2xl font-bold text-slate-800">Gallery</h2>
+                                <h2 className="text-xl md:text-2xl font-bold text-slate-800">Gallery</h2>
                                 {/* Placeholder for future upload */}
                                 <button className="bg-slate-100 text-slate-600 px-4 py-2 rounded-lg flex items-center gap-2 cursor-not-allowed opacity-50">
                                     <Plus size={18} /> Upload Media
@@ -643,9 +716,9 @@ const FacultyDashboard = () => {
 
             {/* Event Modal */}
             {showEventModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 border border-slate-200 shadow-xl animate-fadeIn">
-                        <h3 className="text-xl font-bold mb-4">{selectedItem ? 'Edit Event' : 'Create New Event'}</h3>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="event-modal-title">
+                    <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                        <h3 id="event-modal-title" className="text-lg md:text-xl font-bold mb-4">{selectedItem ? 'Edit Event' : 'Create New Event'}</h3>
                         <form onSubmit={selectedItem ? handleUpdateEvent : handleCreateEvent} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Event Title</label>
@@ -655,7 +728,7 @@ const FacultyDashboard = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
                                 <textarea required value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows="3"></textarea>
                             </div>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
                                     <input type="datetime-local" required value={eventForm.date} onChange={e => setEventForm({ ...eventForm, date: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
@@ -680,9 +753,9 @@ const FacultyDashboard = () => {
 
             {/* Recruitment Modal */}
             {showRecruitmentModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 border border-slate-200 shadow-xl animate-fadeIn">
-                        <h3 className="text-xl font-bold mb-4">{selectedItem ? 'Edit Recruitment' : 'New Recruitment'}</h3>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="recruitment-modal-title">
+                    <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                        <h3 id="recruitment-modal-title" className="text-lg md:text-xl font-bold mb-4">{selectedItem ? 'Edit Recruitment' : 'New Recruitment'}</h3>
                         <form onSubmit={selectedItem ? handleUpdateRecruitment : handleCreateRecruitment} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
@@ -719,9 +792,9 @@ const FacultyDashboard = () => {
 
             {/* Announcement Modal */}
             {showAnnouncementModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-lg p-6 border border-slate-200 shadow-xl animate-fadeIn">
-                        <h3 className="text-xl font-bold mb-4">New Announcement</h3>
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="announcement-modal-title">
+                    <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                        <h3 id="announcement-modal-title" className="text-lg md:text-xl font-bold mb-4">New Announcement</h3>
                         <form onSubmit={handleCreateAnnouncement} className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
@@ -742,26 +815,25 @@ const FacultyDashboard = () => {
 
             {/* Applicants Modal */}
             {showApplicantsModal && selectedItem && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-3xl p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[80vh] overflow-y-auto">
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="applicants-modal-title">
+                    <div className="bg-white rounded-2xl w-full max-w-3xl p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[85vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold">Applicants</h3>
-                            <button onClick={() => setShowApplicantsModal(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20} /></button>
+                            <h3 id="applicants-modal-title" className="text-lg md:text-xl font-bold">Applicants</h3>
+                            <button onClick={() => setShowApplicantsModal(false)} className="p-2 hover:bg-slate-100 rounded-full" aria-label="Close applicants modal"><X size={20} /></button>
                         </div>
 
                         <div className="space-y-4">
                             {selectedItem.applicants?.map(app => (
-                                <div key={app._id} className="border border-slate-200 rounded-lg p-4 flex justify-between items-start">
-                                    <div>
-                                        <p className="font-bold text-slate-900">{app.student?.name || 'Unknown Student'}</p>
-                                        <p className="text-sm text-slate-600">{app.student?.email}</p>
-                                        <div className="mt-2 bg-slate-50 p-2 rounded text-sm text-slate-700">{app.note || 'No cover note'}</div>
+                                <div key={app._id} className="border border-slate-200 rounded-lg p-3 md:p-4 flex flex-col sm:flex-row justify-between items-start gap-3">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="font-bold text-slate-900 text-sm md:text-base">{app.student?.name || 'Unknown Student'}</p>
+                                        <p className="text-xs md:text-sm text-slate-600 truncate">{app.student?.email}</p>
+                                        <div className="mt-2 bg-slate-50 p-2 rounded text-xs md:text-sm text-slate-700">{app.note || 'No cover note'}</div>
                                     </div>
-                                    <div className="text-right">
+                                    <div className="flex-shrink-0">
                                         <span className={`px-2 py-1 text-xs font-bold rounded-full ${app.status === 'selected' ? 'bg-green-100 text-green-700' : app.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                                             {app.status}
                                         </span>
-                                        {/* Faculty could have buttons here to accept/reject applicant if backend supported it in this view */}
                                     </div>
                                 </div>
                             ))}
@@ -810,12 +882,6 @@ const QuickActionCard = ({ title, icon: Icon, onClick }) => (
     </button>
 );
 
-const EmptyState = ({ message }) => (
-    <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-slate-300">
-        <p className="text-slate-500">{message}</p>
-    </div>
-);
 
-const Loader = () => <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>;
 
 export default FacultyDashboard;
