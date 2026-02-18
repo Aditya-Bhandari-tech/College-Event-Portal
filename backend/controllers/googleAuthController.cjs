@@ -37,7 +37,7 @@ exports.checkGoogleUser = async (req, res) => {
 // Google Authentication (Login/Signup)
 exports.googleAuth = async (req, res) => {
   try {
-    const { credential, email, name, googleId, role, branch, phone, isGoogleAuth } = req.body;
+    const { credential, email, name, googleId, role, branch, phone, year, isGoogleAuth } = req.body;
 
     // Verify the Google token
     const googleUser = await verifyGoogleToken(credential);
@@ -52,8 +52,8 @@ exports.googleAuth = async (req, res) => {
     if (user) {
       // User exists - Login flow
       if (!user.isApproved && user.role === 'faculty') {
-        return res.status(403).json({ 
-          message: 'Your account is pending approval from admin' 
+        return res.status(403).json({
+          message: 'Your account is pending approval from admin'
         });
       }
 
@@ -78,6 +78,7 @@ exports.googleAuth = async (req, res) => {
           email: user.email,
           role: user.role,
           branch: user.branch,
+          year: user.year,
           isApproved: user.isApproved,
         },
       });
@@ -88,6 +89,10 @@ exports.googleAuth = async (req, res) => {
       return res.json({ needsProfile: true });
     }
 
+    if (role === 'student' && !year) {
+      return res.status(400).json({ message: 'Year is required for student accounts' });
+    }
+
     // Create new user
     user = new User({
       name,
@@ -96,6 +101,7 @@ exports.googleAuth = async (req, res) => {
       role,
       branch,
       phone: phone || '',
+      year: role === 'student' ? year : undefined,
       password: Math.random().toString(36).slice(-8), // Random password (won't be used)
       isApproved: role === 'student' ? true : false, // Students auto-approved
     });
@@ -118,6 +124,7 @@ exports.googleAuth = async (req, res) => {
           email: user.email,
           role: user.role,
           branch: user.branch,
+          year: user.year,
           isApproved: user.isApproved,
         },
       });
@@ -132,6 +139,7 @@ exports.googleAuth = async (req, res) => {
         email: user.email,
         role: user.role,
         branch: user.branch,
+        year: user.year,
         isApproved: false,
       },
     });

@@ -9,7 +9,7 @@ import generateToken from "../utils/generateToken.js";
  */
 export const register = async (req, res) => {
   try {
-    const { name, email, password, phone, branch, role } = req.body;
+    const { name, email, password, phone, branch, role, year } = req.body;
 
     // Normalize role
     const normalizedRole = role ? role.toLowerCase().trim() : "student";
@@ -18,6 +18,13 @@ export const register = async (req, res) => {
     if (!name || !email || !password || !branch) {
       return res.status(400).json({
         message: "Name, email, password, and branch are required",
+      });
+    }
+
+    // students must provide a year
+    if (normalizedRole === "student" && !year) {
+      return res.status(400).json({
+        message: "Year is required for student accounts",
       });
     }
 
@@ -43,7 +50,8 @@ export const register = async (req, res) => {
       password,
       phone,
       branch,
-      role: normalizedRole, // Use normalized role
+      role: normalizedRole,
+      year: normalizedRole === "student" ? year : undefined,
     });
 
     // 4️⃣ Handle Response based on Role
@@ -58,7 +66,8 @@ export const register = async (req, res) => {
           role: user.role,
           phone: user.phone,
           branch: user.branch,
-          isApproved: user.isApproved, // Should be false by default for faculty
+          year: user.year,
+          isApproved: user.isApproved,
         },
       });
     } else {
@@ -74,6 +83,7 @@ export const register = async (req, res) => {
           role: user.role,
           phone: user.phone,
           branch: user.branch,
+          year: user.year,
           isApproved: user.isApproved,
         },
         token,

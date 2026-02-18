@@ -36,7 +36,15 @@ const userSchema = new mongoose.Schema({
     required: [true, "Branch is required"],
   },
 
-  
+  year: {
+    type: String,
+    enum: ["First Year", "Second Year", "Third Year"],
+    // only students need to specify year
+    required: function() {
+      return this.role === "student";
+    }
+  },
+
   role: {
   type: String,
   enum: ["student", "faculty", "admin"],

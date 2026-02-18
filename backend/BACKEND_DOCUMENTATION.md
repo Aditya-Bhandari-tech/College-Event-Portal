@@ -24,6 +24,7 @@ Represents a user in the system.
   - `password`: String, required (hashed).
   - `phone`: String, 10 digits.
   - `branch`: String, required (e.g., CSE, IT).
+  - `year`: String, enum [`First Year`, `Second Year`, `Third Year`]. Required for students.
   - `role`: Enum [`student`, `faculty`, `admin`]. Default: `student`.
   - `isApproved`: Boolean. `true` for students, `false` for faculty (requires admin approval), `true` for admin.
 - **Key Logic**: 
