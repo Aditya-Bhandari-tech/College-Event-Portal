@@ -172,6 +172,7 @@ export const login = async (req, res) => {
         role: user.role,
         phone: user.phone,
         branch: user.branch,
+        profilePic: user.profilePic || null,
       },
       token,
     });

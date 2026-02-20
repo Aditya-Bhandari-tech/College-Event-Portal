@@ -50,13 +50,22 @@ export const getStudentsByBranch = async (req, res, next) => {
   }
 };
 
-export const uploadProfilePic = async (req, res) => {
+export const uploadProfilePic = async (req, res, next) => {
   try {
-    const user = await User.findById(req.user._id);
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No image file provided" });
+    }
 
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Delete old pic from Cloudinary
     if (user.profilePic?.public_id) {
       await cloudinary.uploader.destroy(user.profilePic.public_id);
     }
+
     user.profilePic = {
       public_id: req.file.filename,
       url: req.file.path,
@@ -64,17 +73,14 @@ export const uploadProfilePic = async (req, res) => {
 
     await user.save();
 
-    res.json({
+    return res.json({
       success: true,
       message: "Profile picture uploaded",
       data: user.profilePic,
     });
 
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    next(error);
   }
 };
 
@@ -124,7 +130,7 @@ export const updateProfile = async (req, res) => {
   }
 };
 
-export const deleteProfilePic = async (req, res) => {
+export const deleteProfilePic = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
 
@@ -142,16 +148,13 @@ export const deleteProfilePic = async (req, res) => {
     user.profilePic = { public_id: null, url: null };
     await user.save();
 
-    res.json({
+    return res.json({
       success: true,
       message: "Profile picture deleted successfully",
       data: user.profilePic,
     });
 
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
+    next(error);
   }
 };

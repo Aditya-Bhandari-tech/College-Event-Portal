@@ -43,12 +43,29 @@ const Dashboard = () => {
 
   useEffect(() => {
     const storedUser = localStorage.getItem('user');
-    if (!storedUser) {
+    const token = localStorage.getItem('token');
+
+    if (!storedUser || !token) {
       navigate('/login');
       return;
     }
+
+    // Set from localStorage immediately (fast render)
     const parsedUser = JSON.parse(storedUser);
     setUser(parsedUser);
+
+    // Then fetch fresh user from DB — ensures profilePic & all fields are up to date
+    axiosInstance.get('/users/me')
+      .then(res => {
+        const freshUser = res.data?.data || res.data;
+        if (freshUser) {
+          setUser(freshUser);
+          localStorage.setItem('user', JSON.stringify(freshUser));
+        }
+      })
+      .catch(() => {
+        // If /me fails, keep using cached localStorage user silently
+      });
 
     if (parsedUser.role === 'admin') {
       fetchUsers();
