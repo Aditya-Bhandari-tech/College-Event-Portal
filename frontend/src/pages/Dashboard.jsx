@@ -755,9 +755,9 @@ const Dashboard = () => {
             </div>
           )}
 
-          {activeRoute === 'Events' && <Events userRole={user.role} />}
-          {activeRoute === 'Announcements' && <Announcements />}
-          {activeRoute === 'Gallery' && <GalleryView galleryEvents={galleryEvents} galleryLoading={galleryLoading} setGalleryEvents={setGalleryEvents} setGalleryLoading={setGalleryLoading} lightbox={lightbox} setLightbox={setLightbox} axiosInstance={axiosInstance} />}
+          {activeRoute === 'Events' && <Events userRole={user.role} user={user} />}
+          {activeRoute === 'Announcements' && <Announcements userRole={user.role} user={user} />}
+          {activeRoute === 'Gallery' && <GalleryView galleryEvents={galleryEvents} galleryLoading={galleryLoading} setGalleryEvents={setGalleryEvents} setGalleryLoading={setGalleryLoading} lightbox={lightbox} setLightbox={setLightbox} axiosInstance={axiosInstance} userRole={user.role} user={user} />}
         </main>
       </div>
 
@@ -1076,15 +1076,26 @@ const StatsCard = ({ icon: Icon, label, count, iconBg, iconColor }) => {
 };
 
 // Gallery View Component
-const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalleryLoading, lightbox, setLightbox, axiosInstance }) => {
+const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalleryLoading, lightbox, setLightbox, axiosInstance, userRole, user }) => {
+  const [allEvents, setAllEvents] = React.useState([]);
+  const [showUploadModal, setShowUploadModal] = React.useState(false);
+  const [uploadEventId, setUploadEventId] = React.useState('');
+  const [uploadFiles, setUploadFiles] = React.useState([]);
+  const [uploading, setUploading] = React.useState(false);
+  const [uploadError, setUploadError] = React.useState('');
+  const [deletingId, setDeletingId] = React.useState(null);
+  const fileInputRef = React.useRef(null);
+
+  const canManage = userRole === 'admin' || userRole === 'faculty';
+
   useEffect(() => {
     const fetchGallery = async () => {
       setGalleryLoading(true);
       try {
         const res = await axiosInstance.get('/events');
-        const allEvents = res.data.data || [];
-        const withImages = allEvents.filter(e => e.images && e.images.length > 0);
-        setGalleryEvents(withImages);
+        const evts = res.data.data || [];
+        setAllEvents(evts);
+        setGalleryEvents(evts.filter(e => e.images && e.images.length > 0));
       } catch (err) {
         console.error('Failed to fetch gallery:', err);
       } finally {
@@ -1094,8 +1105,52 @@ const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalle
     fetchGallery();
   }, []);
 
-  const openLightbox = (images, index) => {
-    setLightbox({ open: true, images, index });
+  const openLightbox = (images, index) => setLightbox({ open: true, images, index });
+
+  /* ── Upload ── */
+  const handleUpload = async (e) => {
+    e.preventDefault();
+    if (!uploadEventId) { setUploadError('Please select an event.'); return; }
+    if (uploadFiles.length === 0) { setUploadError('Please select at least one image.'); return; }
+    setUploading(true);
+    setUploadError('');
+    try {
+      const formData = new FormData();
+      uploadFiles.forEach(f => formData.append('images', f));
+      const res = await axiosInstance.post(`/events/${uploadEventId}/gallery`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      // Refresh gallery
+      const refreshRes = await axiosInstance.get('/events');
+      const evts = refreshRes.data.data || [];
+      setAllEvents(evts);
+      setGalleryEvents(evts.filter(ev => ev.images && ev.images.length > 0));
+      setShowUploadModal(false);
+      setUploadFiles([]);
+      setUploadEventId('');
+    } catch (err) {
+      setUploadError(err.response?.data?.message || 'Upload failed.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  /* ── Delete image ── */
+  const handleDeleteImage = async (eventId, publicId) => {
+    if (!window.confirm('Delete this photo?')) return;
+    setDeletingId(publicId);
+    try {
+      // publicId may contain slashes (Cloudinary folder/id) — encode it
+      await axiosInstance.delete(`/events/${eventId}/gallery/${encodeURIComponent(publicId)}`);
+      setGalleryEvents(prev => prev.map(ev => {
+        if (ev._id !== eventId) return ev;
+        return { ...ev, images: ev.images.filter(img => img.public_id !== publicId) };
+      }).filter(ev => ev.images.length > 0));
+    } catch (err) {
+      console.error('Delete image failed:', err);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   if (galleryLoading) {
@@ -1107,58 +1162,173 @@ const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalle
     );
   }
 
-  if (galleryEvents.length === 0) {
-    return <EmptyState message="No gallery images yet. Images will appear here once they are uploaded to events." />;
-  }
-
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 animate-fadeIn">
+      {/* ── Header ── */}
       <div className="flex items-center justify-between">
-        <h2 className="text-xl md:text-2xl font-bold text-slate-900">Event Gallery</h2>
-        <span className="text-sm text-slate-500">
-          {galleryEvents.reduce((sum, e) => sum + e.images.length, 0)} photos across {galleryEvents.length} events
-        </span>
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900">Event Gallery</h2>
+          <p className="text-sm text-slate-500 mt-0.5">
+            {galleryEvents.reduce((sum, e) => sum + e.images.length, 0)} photos across {galleryEvents.length} events
+          </p>
+        </div>
+        {canManage && (
+          <button
+            onClick={() => { setUploadError(''); setShowUploadModal(true); }}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow hover:shadow-lg hover:shadow-blue-500/25 transition-all text-sm"
+          >
+            <Image size={15} />
+            <span className="hidden sm:inline">Upload Photos</span>
+          </button>
+        )}
       </div>
 
-      {galleryEvents.map(event => (
-        <section key={event._id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="p-4 md:p-5 border-b border-slate-100">
-            <div className="flex items-center justify-between">
+      {galleryEvents.length === 0 ? (
+        <EmptyState message="No gallery images yet. Upload images to events to see them here." />
+      ) : (
+        galleryEvents.map(event => (
+          <section key={event._id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="p-4 md:p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-lg text-slate-900">{event.title}</h3>
-                <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
-                  <span className="flex items-center gap-1"><Calendar size={14} /> {new Date(event.date).toLocaleDateString()}</span>
-                  <span className="flex items-center gap-1"><MapPin size={14} /> {event.venue}</span>
+                <div className="flex items-center gap-3 mt-0.5 text-sm text-slate-500">
+                  <span className="flex items-center gap-1"><Calendar size={13} /> {new Date(event.date).toLocaleDateString()}</span>
+                  <span className="flex items-center gap-1"><MapPin size={13} /> {event.venue}</span>
                 </div>
               </div>
               <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-semibold rounded-full">
                 {event.images.length} photos
               </span>
             </div>
-          </div>
-          <div className="p-3 md:p-4">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
-              {event.images.map((img, idx) => (
-                <div
-                  key={img.public_id || idx}
-                  className="group aspect-square rounded-xl overflow-hidden cursor-pointer relative"
-                  onClick={() => openLightbox(event.images, idx)}
-                >
-                  <img
-                    src={img.url}
-                    alt={`${event.title} photo ${idx + 1}`}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-center justify-center">
-                    <Maximize2 size={24} className="text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+
+            <div className="p-3 md:p-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
+                {event.images.map((img, idx) => (
+                  <div
+                    key={img.public_id || idx}
+                    className="group aspect-square rounded-xl overflow-hidden cursor-pointer relative"
+                  >
+                    <img
+                      src={img.url}
+                      alt={`${event.title} photo ${idx + 1}`}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      loading="lazy"
+                      onClick={() => openLightbox(event.images, idx)}
+                    />
+                    <div
+                      className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-center justify-center"
+                      onClick={() => openLightbox(event.images, idx)}
+                    >
+                      <Maximize2 size={22} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    {/* Delete button for faculty/admin */}
+                    {canManage && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteImage(event._id, img.public_id); }}
+                        disabled={deletingId === img.public_id}
+                        className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-md disabled:opacity-50"
+                        title="Delete photo"
+                      >
+                        {deletingId === img.public_id
+                          ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          : <X size={12} />
+                        }
+                      </button>
+                    )}
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
+          </section>
+        ))
+      )}
+
+      {/* ── Upload Modal ── */}
+      {showUploadModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-[70] backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowUploadModal(false)}
+        >
+          <div
+            className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden animate-fadeIn"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600">
+              <h2 className="text-white font-bold text-lg">Upload Photos</h2>
+              <button onClick={() => setShowUploadModal(false)} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpload} className="p-6 space-y-4">
+              {uploadError && (
+                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+                  <AlertCircle size={15} className="flex-shrink-0" />
+                  <span>{uploadError}</span>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Select Event *</label>
+                <select
+                  value={uploadEventId}
+                  onChange={e => setUploadEventId(e.target.value)}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
+                >
+                  <option value="">Choose an event…</option>
+                  {allEvents.map(ev => (
+                    <option key={ev._id} value={ev._id}>{ev.title}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Photos *</label>
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-6 text-center cursor-pointer transition-colors"
+                >
+                  <Image size={28} className="mx-auto text-slate-300 mb-2" />
+                  {uploadFiles.length > 0 ? (
+                    <p className="text-sm text-blue-600 font-semibold">{uploadFiles.length} file{uploadFiles.length > 1 ? 's' : ''} selected</p>
+                  ) : (
+                    <p className="text-sm text-slate-500">Click to select images (max 10)</p>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  className="hidden"
+                  onChange={e => setUploadFiles(Array.from(e.target.files).slice(0, 10))}
+                />
+              </div>
+
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowUploadModal(false)}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-semibold text-sm hover:bg-slate-50 transition-colors"
+                  disabled={uploading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={uploading}
+                  className="flex-1 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold text-sm hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {uploading
+                    ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading…</>
+                    : <><Image size={15} /> Upload Photos</>
+                  }
+                </button>
+              </div>
+            </form>
           </div>
-        </section>
-      ))}
+        </div>
+      )}
     </div>
   );
 };
