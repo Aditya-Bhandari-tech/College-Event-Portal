@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Users, Briefcase, Calendar, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Users, Briefcase, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
 import axiosInstance from '../api/axios';
 import Loader from '../components/common/Loader';
 import EmptyState from '../components/common/EmptyState';
@@ -8,24 +8,40 @@ import EmptyState from '../components/common/EmptyState';
 const Recruitment = () => {
     const navigate = useNavigate();
     const [recruitments, setRecruitments] = useState([]);
+    const [myApplications, setMyApplications] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadingApps, setLoadingApps] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [selectedRole, setSelectedRole] = useState(null);
     const [note, setNote] = useState('');
+    const [activeTab, setActiveTab] = useState('openings');
 
     useEffect(() => {
         fetchRecruitments();
+        fetchMyApplications();
     }, []);
 
     const fetchRecruitments = async () => {
         setLoading(true);
         try {
-            const res = await axiosInstance.get('/recruitments?status=open'); // Fetch only open ones
+            const res = await axiosInstance.get('/recruitments?status=open');
             setRecruitments(res.data.data || []);
         } catch (error) {
             console.error("Failed to fetch recruitments", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchMyApplications = async () => {
+        setLoadingApps(true);
+        try {
+            const res = await axiosInstance.get('/recruitments/my-applications');
+            setMyApplications(res.data.data || []);
+        } catch (error) {
+            console.error("Failed to fetch applications", error);
+        } finally {
+            setLoadingApps(false);
         }
     };
 
@@ -36,12 +52,38 @@ const Recruitment = () => {
             alert("Application submitted successfully!");
             setShowModal(false);
             setNote('');
-            // Optimistically update UI or re-fetch if needed
-            // For now, assume success means applied. 
-            // Ideally backend would mark it applied or re-fetch would show status if we tracked it per user
+            fetchMyApplications(); // Refresh to show new application
         } catch (error) {
             console.error("Failed to apply", error);
             alert(error.response?.data?.message || "Failed to submit application");
+        }
+    };
+
+    // Check if student already applied for a recruitment
+    const hasApplied = (recruitmentId) => {
+        return myApplications.some(app => app.recruitmentId === recruitmentId);
+    };
+
+    const getStatusBadge = (status) => {
+        switch (status) {
+            case 'selected':
+                return (
+                    <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full flex items-center gap-1">
+                        <CheckCircle size={12} /> Accepted
+                    </span>
+                );
+            case 'rejected':
+                return (
+                    <span className="px-3 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full flex items-center gap-1">
+                        <XCircle size={12} /> Rejected
+                    </span>
+                );
+            default:
+                return (
+                    <span className="px-3 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-full flex items-center gap-1">
+                        <Clock size={12} /> Pending
+                    </span>
+                );
         }
     };
 
@@ -58,41 +100,105 @@ const Recruitment = () => {
                     </div>
                 </div>
 
-                {loading ? <Loader /> : (
-                    <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
-                        {recruitments.length > 0 ? recruitments.map(rec => (
-                            <article key={rec._id} className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all flex flex-col justify-between h-full">
-                                <div>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div className="bg-blue-50 text-blue-600 p-2 rounded-lg">
-                                            <Briefcase size={24} />
-                                        </div>
-                                        <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full uppercase">
-                                            Open
-                                        </span>
-                                    </div>
-                                    <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-1">{rec.title}</h3>
-                                    <p className="text-blue-600 font-medium text-sm mb-3">{rec.roleType} • {rec.event?.title || 'General Event'}</p>
-                                    <p className="text-slate-600 mb-6 text-sm leading-relaxed">{rec.description}</p>
-
-                                    <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-slate-500 mb-6">
-                                        <span className="flex items-center gap-1"><Users size={14} /> {rec.branch}</span>
-                                        <span className="flex items-center gap-1"><Calendar size={14} /> {new Date(rec.createdAt).toLocaleDateString()}</span>
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => { setSelectedRole(rec); setShowModal(true); }}
-                                    className="w-full py-3 border-t border-slate-100 text-blue-600 font-semibold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
-                                >
-                                    Apply Now
-                                </button>
-                            </article>
-                        )) : (
-                            <div className="col-span-2">
-                                <EmptyState message="No current open recruiting positions." />
-                            </div>
+                {/* Tabs */}
+                <div className="flex gap-1 bg-white rounded-xl p-1 shadow-sm border border-slate-200 mb-6">
+                    <button
+                        onClick={() => setActiveTab('openings')}
+                        className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'openings' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
+                    >
+                        Open Positions
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('applications')}
+                        className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all relative ${activeTab === 'applications' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-600 hover:bg-slate-50'}`}
+                    >
+                        My Applications
+                        {myApplications.length > 0 && (
+                            <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded-full ${activeTab === 'applications' ? 'bg-white/20' : 'bg-blue-100 text-blue-600'}`}>
+                                {myApplications.length}
+                            </span>
                         )}
-                    </div>
+                    </button>
+                </div>
+
+                {/* Open Positions Tab */}
+                {activeTab === 'openings' && (
+                    loading ? <Loader /> : (
+                        <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
+                            {recruitments.length > 0 ? recruitments.map(rec => (
+                                <article key={rec._id} className="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all flex flex-col justify-between h-full">
+                                    <div>
+                                        <div className="flex justify-between items-start mb-4">
+                                            <div className="bg-blue-50 text-blue-600 p-2 rounded-lg">
+                                                <Briefcase size={24} />
+                                            </div>
+                                            <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-full uppercase">
+                                                Open
+                                            </span>
+                                        </div>
+                                        <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-1">{rec.title}</h3>
+                                        <p className="text-blue-600 font-medium text-sm mb-3">{rec.roleType} • {rec.event?.title || 'General Event'}</p>
+                                        <p className="text-slate-600 mb-6 text-sm leading-relaxed">{rec.description}</p>
+
+                                        <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-slate-500 mb-6">
+                                            <span className="flex items-center gap-1"><Users size={14} /> {rec.branch}</span>
+                                            <span className="flex items-center gap-1"><Calendar size={14} /> {new Date(rec.createdAt).toLocaleDateString()}</span>
+                                        </div>
+                                    </div>
+                                    {hasApplied(rec._id) ? (
+                                        <div className="w-full py-3 border-t border-slate-100 text-green-600 font-semibold flex items-center justify-center gap-2 text-sm">
+                                            <CheckCircle size={16} /> Already Applied
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => { setSelectedRole(rec); setShowModal(true); }}
+                                            className="w-full py-3 border-t border-slate-100 text-blue-600 font-semibold hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            Apply Now
+                                        </button>
+                                    )}
+                                </article>
+                            )) : (
+                                <div className="col-span-2">
+                                    <EmptyState message="No current open recruiting positions." />
+                                </div>
+                            )}
+                        </div>
+                    )
+                )}
+
+                {/* My Applications Tab */}
+                {activeTab === 'applications' && (
+                    loadingApps ? <Loader /> : (
+                        myApplications.length > 0 ? (
+                            <div className="space-y-4">
+                                {myApplications.map(app => (
+                                    <article key={app._id} className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200">
+                                        <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                    <h3 className="font-bold text-base md:text-lg text-slate-900">{app.recruitmentTitle}</h3>
+                                                    {getStatusBadge(app.applicationStatus)}
+                                                </div>
+                                                <p className="text-sm text-blue-600 font-medium mb-1">{app.roleType} • {app.event?.title || 'General Event'}</p>
+                                                {app.note && (
+                                                    <div className="mt-2 bg-slate-50 p-2 rounded text-xs text-slate-600">
+                                                        <span className="font-medium text-slate-700">Your note:</span> {app.note}
+                                                    </div>
+                                                )}
+                                                <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-slate-500">
+                                                    <span className="flex items-center gap-1"><Calendar size={12} /> Applied: {new Date(app.appliedAt).toLocaleDateString()}</span>
+                                                    {app.event?.venue && <span>📍 {app.event.venue}</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </article>
+                                ))}
+                            </div>
+                        ) : (
+                            <EmptyState message="You haven't applied for any positions yet. Check out the Open Positions tab!" />
+                        )
+                    )
                 )}
             </div>
 
@@ -148,3 +254,4 @@ const Recruitment = () => {
 };
 
 export default Recruitment;
+

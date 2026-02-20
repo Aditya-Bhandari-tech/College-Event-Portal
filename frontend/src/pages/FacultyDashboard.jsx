@@ -211,9 +211,25 @@ const FacultyDashboard = () => {
             setShowApplicantsModal(true);
         } catch (error) {
             console.error("Error fetching applicants", error);
-            alert("Failed to fetch applicants");
+            alert(error.response?.data?.message || "Failed to fetch applicants");
         } finally {
             setLoading(prev => ({ ...prev, applicants: false }));
+        }
+    };
+
+    const handleUpdateApplicantStatus = async (recruitmentId, applicantId, status) => {
+        try {
+            await axiosInstance.patch(`/recruitments/${recruitmentId}/applicants/${applicantId}`, { status });
+            // Update local state
+            setSelectedItem(prev => ({
+                ...prev,
+                applicants: prev.applicants.map(app =>
+                    app._id === applicantId ? { ...app, status } : app
+                )
+            }));
+        } catch (error) {
+            console.error("Update applicant status failed", error);
+            alert(error.response?.data?.message || "Failed to update applicant status");
         }
     };
 
@@ -291,7 +307,7 @@ const FacultyDashboard = () => {
             fetchEvents();
         } catch (error) {
             console.error("Create event failed", error);
-            alert("Failed to create event");
+            alert(error.response?.data?.message || "Failed to create event");
         }
     };
 
@@ -305,7 +321,7 @@ const FacultyDashboard = () => {
             fetchEvents();
         } catch (error) {
             console.error("Update event failed", error);
-            alert("Failed to update event");
+            alert(error.response?.data?.message || "Failed to update event");
         }
     };
 
@@ -317,7 +333,7 @@ const FacultyDashboard = () => {
             fetchEvents();
         } catch (error) {
             console.error("Delete event failed", error);
-            alert("Failed to delete event");
+            alert(error.response?.data?.message || "Failed to delete event");
         }
     };
 
@@ -353,7 +369,7 @@ const FacultyDashboard = () => {
             fetchRecruitments();
         } catch (error) {
             console.error("Create recruitment failed", error);
-            alert("Failed to post recruitment");
+            alert(error.response?.data?.message || "Failed to post recruitment");
         }
     };
 
@@ -367,7 +383,7 @@ const FacultyDashboard = () => {
             fetchRecruitments();
         } catch (error) {
             console.error("Update recruitment failed", error);
-            alert("Failed to update recruitment");
+            alert(error.response?.data?.message || "Failed to update recruitment");
         }
     };
 
@@ -379,7 +395,7 @@ const FacultyDashboard = () => {
             fetchRecruitments();
         } catch (error) {
             console.error("Delete recruitment failed", error);
-            alert("Failed to delete recruitment");
+            alert(error.response?.data?.message || "Failed to delete recruitment");
         }
     };
 
@@ -392,7 +408,7 @@ const FacultyDashboard = () => {
             fetchAnnouncements();
         } catch (error) {
             console.error("Create announcement failed", error);
-            alert("Failed to post announcement");
+            alert(error.response?.data?.message || "Failed to post announcement");
         }
     };
 
@@ -404,7 +420,7 @@ const FacultyDashboard = () => {
             fetchAnnouncements();
         } catch (error) {
             console.error("Delete announcement failed", error);
-            alert("Failed to delete announcement");
+            alert(error.response?.data?.message || "Failed to delete announcement");
         }
     };
 
@@ -899,9 +915,11 @@ const FacultyDashboard = () => {
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Role Type</label>
                                 <select required value={recruitmentForm.roleType} onChange={e => setRecruitmentForm({ ...recruitmentForm, roleType: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
                                     <option value="">Select Role</option>
-                                    <option value="Volunteer">Volunteer</option>
-                                    <option value="Coordinator">Coordinator</option>
-                                    <option value="Lead">Lead</option>
+                                    <option value="volunteer">Volunteer</option>
+                                    <option value="anchor">Anchor</option>
+                                    <option value="coordinator">Coordinator</option>
+                                    <option value="technical">Technical</option>
+                                    <option value="other">Other</option>
                                 </select>
                             </div>
                             <div>
@@ -962,12 +980,32 @@ const FacultyDashboard = () => {
                                     <div className="min-w-0 flex-1">
                                         <p className="font-bold text-slate-900 text-sm md:text-base">{app.student?.name || 'Unknown Student'}</p>
                                         <p className="text-xs md:text-sm text-slate-600 truncate">{app.student?.email}</p>
+                                        {app.student?.branch && <p className="text-xs text-slate-500 mt-0.5">{app.student.branch}</p>}
                                         <div className="mt-2 bg-slate-50 p-2 rounded text-xs md:text-sm text-slate-700">{app.note || 'No cover note'}</div>
                                     </div>
-                                    <div className="flex-shrink-0">
-                                        <span className={`px-2 py-1 text-xs font-bold rounded-full ${app.status === 'selected' ? 'bg-green-100 text-green-700' : app.status === 'rejected' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-                                            {app.status}
-                                        </span>
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        {app.status === 'applied' ? (
+                                            <>
+                                                <button
+                                                    onClick={() => handleUpdateApplicantStatus(selectedItem.recruitmentId, app._id, 'selected')}
+                                                    className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors flex items-center gap-1"
+                                                    aria-label={`Accept ${app.student?.name}`}
+                                                >
+                                                    <Check size={14} /> Accept
+                                                </button>
+                                                <button
+                                                    onClick={() => handleUpdateApplicantStatus(selectedItem.recruitmentId, app._id, 'rejected')}
+                                                    className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors flex items-center gap-1"
+                                                    aria-label={`Reject ${app.student?.name}`}
+                                                >
+                                                    <X size={14} /> Reject
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <span className={`px-3 py-1.5 text-xs font-bold rounded-full ${app.status === 'selected' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                {app.status === 'selected' ? '✓ Accepted' : '✗ Rejected'}
+                                            </span>
+                                        )}
                                     </div>
                                 </div>
                             ))}
