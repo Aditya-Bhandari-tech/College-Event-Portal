@@ -1,7 +1,7 @@
 // routes/userRoutes.js
 import express from "express";
 import { authMiddleware, roleMiddleware } from "../middleware/authMiddleware.js";
-import { getMe, getStudentsByBranch, uploadProfilePic, deleteProfilePic } from "../controllers/userController.js";
+import { getMe, getStudentsByBranch, uploadProfilePic, deleteProfilePic, updateProfile } from "../controllers/userController.js";
 import upload from "../middleware/upload.js";
 
 const router = express.Router();
@@ -47,5 +47,12 @@ router.delete(
   authMiddleware,
   deleteProfilePic
 );
+
+/**
+ * @route   PUT /api/users/profile
+ * @desc    Update name and/or password
+ * @access  Private
+ */
+router.put("/profile", authMiddleware, updateProfile);
 
 export default router;

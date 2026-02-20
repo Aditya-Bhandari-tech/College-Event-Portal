@@ -2,6 +2,7 @@
 import User from "../models/User.js";
 import { sendSuccess, sendError } from "../utils/apiResponse.js";
 import cloudinary from "../config/cloudinary.js";
+import bcrypt from "bcryptjs";
 
 // GET /api/users/me
 export const getMe = async (req, res, next) => {
@@ -74,6 +75,52 @@ export const uploadProfilePic = async (req, res) => {
       success: false,
       message: error.message,
     });
+  }
+};
+
+// PUT /api/users/profile
+export const updateProfile = async (req, res) => {
+  try {
+    const { name, newPassword, confirmPassword } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return sendError(res, "User not found", 404);
+    }
+
+    // Update name if provided
+    if (name && name.trim()) {
+      user.name = name.trim();
+    }
+
+    // Update password if provided
+    if (newPassword || confirmPassword) {
+      if (!newPassword || !confirmPassword) {
+        return sendError(res, "Please provide both new password and confirm password", 400);
+      }
+      if (newPassword !== confirmPassword) {
+        return sendError(res, "Passwords do not match", 400);
+      }
+      if (newPassword.length < 6) {
+        return sendError(res, "Password must be at least 6 characters", 400);
+      }
+      user.password = newPassword; // pre-save hook will hash it
+    }
+
+    await user.save();
+
+    return sendSuccess(res, "Profile updated successfully", {
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      branch: user.branch,
+      profilePic: user.profilePic,
+    }, 200);
+
+  } catch (error) {
+    console.error("Update profile error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
