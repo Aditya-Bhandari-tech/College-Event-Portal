@@ -165,7 +165,7 @@ const FacultyDashboard = () => {
         try {
             const res = await axiosInstance.get('/recruitments?status=all');
             const allRecruitments = res.data.data || [];
-            const myRecruitments = allRecruitments.filter(r => r.createdBy._id === user._id || r.createdBy === user._id);
+            const myRecruitments = allRecruitments.filter(r => r.createdBy?._id === user._id || r.createdBy === user._id);
             setRecruitments(myRecruitments);
         } catch (error) {
             console.error("Error fetching recruitments", error);
@@ -207,7 +207,7 @@ const FacultyDashboard = () => {
         setLoading(prev => ({ ...prev, applicants: true }));
         try {
             const res = await axiosInstance.get(`/recruitments/${recruitmentId}/applicants`);
-            setSelectedItem({ ...selectedItem, applicants: res.data.data.applicants, recruitmentId });
+            setSelectedItem(prev => ({ ...(prev || {}), applicants: res.data.data.applicants, recruitmentId }));
             setShowApplicantsModal(true);
         } catch (error) {
             console.error("Error fetching applicants", error);
@@ -1096,7 +1096,7 @@ const FacultyDashboard = () => {
                 </div>
             )}
 
-            <style jsx>{`
+            <style>{`
                 @keyframes fadeIn {
                     from { opacity: 0; transform: translateY(-10px); }
                     to { opacity: 1; transform: translateY(0); }
