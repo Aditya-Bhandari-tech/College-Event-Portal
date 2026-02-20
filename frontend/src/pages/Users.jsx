@@ -49,16 +49,6 @@ const Users = () => {
     }
   };
 
-  const handleRoleChange = async (id, newRole) => {
-    try {
-      // Check if endpoint exists, otherwise this might need backend update
-      await axiosInstance.put(`/admin/users/${id}/role`, { role: newRole });
-      setUsers(users.map(user => user._id === id ? { ...user, role: newRole } : user));
-    } catch (error) {
-      console.error("Failed to update role", error);
-      alert("Failed to update role. Ensure backend supports this.");
-    }
-  };
 
   const filteredUsers = users.filter(user =>
     user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -112,15 +102,9 @@ const Users = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <select
-                          value={user.role}
-                          onChange={(e) => handleRoleChange(user._id, e.target.value)}
-                          className="bg-slate-100 border-none text-sm rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                        >
-                          <option value="student">Student</option>
-                          <option value="faculty">Faculty</option>
-                          <option value="admin">Admin</option>
-                        </select>
+                        <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 capitalize">
+                          {user.role}
+                        </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-700">{user.branch || "N/A"}</td>
                       <td className="px-6 py-4">
@@ -190,16 +174,9 @@ const Users = () => {
                     <span className="text-slate-300">|</span>
                     <div className="flex items-center gap-1">
                       <span className="text-slate-500">Role:</span>
-                      <select
-                        value={user.role}
-                        onChange={(e) => handleRoleChange(user._id, e.target.value)}
-                        className="bg-slate-100 border-none text-sm rounded-lg px-2 py-1 focus:ring-2 focus:ring-blue-500 cursor-pointer"
-                        aria-label={`Change role for ${user.name}`}
-                      >
-                        <option value="student">Student</option>
-                        <option value="faculty">Faculty</option>
-                        <option value="admin">Admin</option>
-                      </select>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 capitalize">
+                        {user.role}
+                      </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
