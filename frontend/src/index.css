@@ -165,3 +165,8 @@ body {
   text-size-adjust: 100%;
   -webkit-text-size-adjust: 100%;
 }
+
+/* Hide Skip to main content link */
+.skip-link {
+  display: none;
+}
