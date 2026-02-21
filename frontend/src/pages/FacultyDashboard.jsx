@@ -10,9 +10,12 @@ import axiosInstance from '../api/axios';
 import Loader from '../components/common/Loader';
 import EmptyState from '../components/common/EmptyState';
 import ProfileModal from '../components/profile/ProfileModal';
+import { useTheme } from '../contexts/ThemeContext';
+import DarkModeToggle from '../components/common/DarkModeToggle';
 
 const FacultyDashboard = () => {
     const navigate = useNavigate();
+    const { darkMode, portalSettings } = useTheme();
     const [user, setUser] = useState(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
@@ -481,7 +484,7 @@ const FacultyDashboard = () => {
     if (!user) return <div className="min-h-screen flex items-center justify-center" role="status" aria-label="Loading"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div><span className="sr-only">Loading...</span></div>;
 
     return (
-        <div className="min-h-screen font-sans" style={{ backgroundColor: '#f9f8f6' }}>
+        <div className={`min-h-screen font-sans transition-colors duration-300 ${darkMode ? 'dark bg-slate-950' : 'bg-[#f9f8f6]'}`}>
             {/* Mobile Sidebar Overlay */}
             {mobileSidebarOpen && (
                 <div
@@ -559,7 +562,7 @@ const FacultyDashboard = () => {
             {/* Main Content */}
             <main className={`transition-all duration-300 ml-0 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
                 {/* Header */}
-                <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm">
+                <header className={`sticky top-0 z-30 backdrop-blur-xl border-b shadow-sm transition-colors duration-300 ${darkMode ? 'bg-slate-900/90 border-slate-700/60' : 'bg-white/80 border-slate-200/60'}`}>
                     <div className="px-4 md:px-8 py-3 md:py-4 flex items-center justify-between gap-4">
                         {/* Mobile hamburger */}
                         <button
@@ -570,9 +573,11 @@ const FacultyDashboard = () => {
                             <Menu size={24} className="text-slate-700" />
                         </button>
                         <div className="hidden sm:block">
-                            <h1 className="text-lg md:text-2xl font-bold text-slate-900">{getGreeting()}, <span className="text-blue-600">{user.name.split(' ')[0]}</span></h1>
+                            <h1 className={`text-lg md:text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{getGreeting()}, <span className="text-blue-500">{user.name.split(' ')[0]}</span></h1>
                         </div>
                         <div className="flex items-center gap-2 md:gap-4 flex-1 sm:flex-none justify-end">
+                            {/* Dark mode toggle */}
+                            <DarkModeToggle />
                             <div className="relative">
                                 <button
                                     onClick={() => setShowProfileMenu(!showProfileMenu)}
@@ -652,8 +657,16 @@ const FacultyDashboard = () => {
                     {/* Event Requests */}
                     {activeRoute === 'Event Requests' && (
                         <div className="animate-fadeIn">
-                            <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6 text-slate-800">Student Event Requests</h2>
-                            {loading.requests ? <Loader /> : (
+                            <h2 className={`text-xl md:text-2xl font-bold mb-4 md:mb-6 ${darkMode ? 'text-white' : 'text-slate-800'}`}>Student Event Requests</h2>
+                            {!portalSettings.studentEventRequests ? (
+                                <div className={`rounded-2xl border-2 border-dashed p-10 text-center ${darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+                                    <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                        <FileText size={24} className="text-amber-500" />
+                                    </div>
+                                    <p className={`font-bold text-lg mb-1 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Student Event Requests Disabled</p>
+                                    <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>An admin has turned off student event requests in System Settings.</p>
+                                </div>
+                            ) : loading.requests ? <Loader /> : (
                                 <div className="grid gap-4">
                                     {requests.map(req => (
                                         <div key={req._id} className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200">
@@ -687,12 +700,22 @@ const FacultyDashboard = () => {
                     {activeRoute === 'Recruitment' && (
                         <div className="animate-fadeIn">
                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
-                                <h2 className="text-xl md:text-2xl font-bold text-slate-800">Recruitments</h2>
-                                <button onClick={() => { setRecruitmentForm({ title: '', roleType: '', description: '', branch: user.branch, eventId: '' }); setSelectedItem(null); setShowRecruitmentModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm w-full sm:w-auto justify-center">
-                                    <Plus size={18} /> New Post
-                                </button>
+                                <h2 className={`text-xl md:text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>Recruitments</h2>
+                                {portalSettings.recruitmentOpen && (
+                                    <button onClick={() => { setRecruitmentForm({ title: '', roleType: '', description: '', branch: user.branch, eventId: '' }); setSelectedItem(null); setShowRecruitmentModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm w-full sm:w-auto justify-center">
+                                        <Plus size={18} /> New Post
+                                    </button>
+                                )}
                             </div>
-                            {loading.recruitments ? <Loader /> : (
+                            {!portalSettings.recruitmentOpen ? (
+                                <div className={`rounded-2xl border-2 border-dashed p-10 text-center ${darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+                                    <div className="w-14 h-14 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                                        <UserPlus size={24} className="text-rose-500" />
+                                    </div>
+                                    <p className={`font-bold text-lg mb-1 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Recruitment Disabled</p>
+                                    <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>An admin has turned off recruitment/volunteering in System Settings.</p>
+                                </div>
+                            ) : loading.recruitments ? <Loader /> : (
                                 <div className="grid gap-4">
                                     {recruitments.map(rec => (
                                         <div key={rec._id} className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200">
