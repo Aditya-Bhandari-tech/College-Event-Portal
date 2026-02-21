@@ -3,12 +3,13 @@ import {
     Calendar, Users, Bell, Search, Image,
     UserPlus, Edit, Trash, Plus, FileText, CheckCircle, XCircle,
     UserCheck, ChevronRight, ChevronLeft, Menu, LogOut, Settings, Award, Check, X, Download,
-    Upload, Trash2, Maximize2
+    Upload, Trash2, Maximize2, User
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axios';
 import Loader from '../components/common/Loader';
 import EmptyState from '../components/common/EmptyState';
+import ProfileModal from '../components/profile/ProfileModal';
 import { useTheme } from '../contexts/ThemeContext';
 import DarkModeToggle from '../components/common/DarkModeToggle';
 
@@ -21,6 +22,7 @@ const FacultyDashboard = () => {
     const [activeRoute, setActiveRoute] = useState('Dashboard');
     const [searchQuery, setSearchQuery] = useState('');
     const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const [showProfilePanel, setShowProfilePanel] = useState(false);
     const [currentTime, setCurrentTime] = useState(new Date());
 
     // Stats
@@ -71,7 +73,8 @@ const FacultyDashboard = () => {
 
     useEffect(() => {
         const storedUser = localStorage.getItem('user');
-        if (!storedUser) {
+        const token = localStorage.getItem('token');
+        if (!storedUser || !token) {
             navigate('/login');
             return;
         }
@@ -82,7 +85,16 @@ const FacultyDashboard = () => {
         }
         setUser(parsedUser);
 
-        // Timer
+        axiosInstance.get('/users/me')
+            .then(res => {
+                const freshUser = res.data?.data || res.data;
+                if (freshUser) {
+                    setUser(freshUser);
+                    localStorage.setItem('user', JSON.stringify(freshUser));
+                }
+            })
+            .catch(() => {});
+
         const timer = setInterval(() => setCurrentTime(new Date()), 60000);
         return () => clearInterval(timer);
     }, [navigate]);
@@ -569,15 +581,22 @@ const FacultyDashboard = () => {
                             <div className="relative">
                                 <button
                                     onClick={() => setShowProfileMenu(!showProfileMenu)}
-                                    className="w-9 h-9 md:w-10 md:h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm"
+                                    className="w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-sm overflow-hidden ring-2 ring-blue-500/30 shadow-md"
                                     aria-expanded={showProfileMenu}
                                     aria-haspopup="true"
                                     aria-label="User menu"
                                 >
-                                    {user.name.charAt(0)}
+                                    {user.profilePic?.url ? (
+                                        <img src={user.profilePic.url} alt={user.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <span className="bg-blue-100 text-blue-600 w-full h-full flex items-center justify-center">{user.name.charAt(0)}</span>
+                                    )}
                                 </button>
                                 {showProfileMenu && (
-                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1 animate-fadeIn" role="menu">
+                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1 animate-fadeIn z-50" role="menu">
+                                        <button onClick={() => { setShowProfilePanel(true); setShowProfileMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 flex items-center gap-2" role="menuitem">
+                                            <User size={16} /> Profile
+                                        </button>
                                         <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-red-600 flex items-center gap-2" role="menuitem">
                                             <LogOut size={16} /> Logout
                                         </button>
@@ -1156,6 +1175,21 @@ const FacultyDashboard = () => {
                     </div>
                 </div>
             )}
+
+            <ProfileModal
+                open={showProfilePanel}
+                onClose={() => setShowProfilePanel(false)}
+                user={user}
+                onUserUpdate={(u) => {
+                    setUser(u);
+                    localStorage.setItem('user', JSON.stringify(u));
+                }}
+                onLogout={() => {
+                    localStorage.removeItem('token');
+                    localStorage.removeItem('user');
+                    navigate('/login');
+                }}
+            />
 
             <style>{`
                 @keyframes fadeIn {

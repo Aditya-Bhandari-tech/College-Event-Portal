@@ -238,6 +238,89 @@ export const updateRecruitment = async (req, res, next) => {
   }
 };
 
+// UPDATE APPLICANT STATUS (FACULTY / ADMIN)
+export const updateApplicantStatus = async (req, res, next) => {
+  try {
+    const { id, applicantId } = req.params;
+    const { status } = req.body;
+
+    if (!status || !["selected", "rejected"].includes(status)) {
+      return sendError(res, "Status must be 'selected' or 'rejected'", 400);
+    }
+
+    const recruitment = await Recruitment.findById(id);
+    if (!recruitment) {
+      return sendError(res, "Recruitment not found", 404);
+    }
+
+    const applicant = recruitment.applicants.id(applicantId);
+    if (!applicant) {
+      return sendError(res, "Applicant not found", 404);
+    }
+
+    applicant.status = status;
+    await recruitment.save();
+
+    return sendSuccess(
+      res,
+      `Applicant ${status} successfully`,
+      applicant,
+      200
+    );
+  } catch (error) {
+    console.error("Update applicant status error:", error);
+
+    if (error.name === "CastError") {
+      return sendError(res, "Invalid id format", 400);
+    }
+
+    return next(error);
+  }
+};
+
+// GET MY APPLICATIONS (STUDENT)
+export const getMyApplications = async (req, res, next) => {
+  try {
+    const studentId = req.user._id;
+
+    const recruitments = await Recruitment.find({
+      "applicants.student": studentId,
+    })
+      .populate("event", "title date venue")
+      .populate("createdBy", "name role")
+      .sort({ createdAt: -1 });
+
+    // Map to return only this student's application info
+    const applications = recruitments.map((rec) => {
+      const myApp = rec.applicants.find(
+        (app) => app.student.toString() === studentId.toString()
+      );
+      return {
+        _id: myApp._id,
+        recruitmentId: rec._id,
+        recruitmentTitle: rec.title,
+        roleType: rec.roleType,
+        recruitmentStatus: rec.status,
+        event: rec.event,
+        createdBy: rec.createdBy,
+        applicationStatus: myApp.status,
+        note: myApp.note,
+        appliedAt: myApp.createdAt,
+      };
+    });
+
+    return sendSuccess(
+      res,
+      "Your applications fetched successfully",
+      applications,
+      200
+    );
+  } catch (error) {
+    console.error("Get my applications error:", error);
+    return next(error);
+  }
+};
+
 // DELETE RECRUITMENT (ADMIN OR FACULTY OWNER)
 export const deleteRecruitment = async (req, res, next) => {
   try {
