@@ -93,7 +93,7 @@ const FacultyDashboard = () => {
                     localStorage.setItem('user', JSON.stringify(freshUser));
                 }
             })
-            .catch(() => {});
+            .catch(() => { });
 
         const timer = setInterval(() => setCurrentTime(new Date()), 60000);
         return () => clearInterval(timer);

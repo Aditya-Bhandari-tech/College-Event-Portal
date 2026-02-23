@@ -5,7 +5,8 @@ import {
   Menu, X, Settings, User, Award, Check, Trash2, Maximize2,
   Camera, Edit2, Eye, EyeOff, Save, AlertCircle, CheckCircle,
   CheckCheck, BriefcaseBusiness, Sun, Moon, ToggleLeft, ToggleRight,
-  Shield, Globe, Building2, Mail, BookOpen, Megaphone, Star
+  Shield, Globe, Building2, Mail, BookOpen, Megaphone, Star,
+  Briefcase, Plus, ChevronDown, UserCheck, FileCheck
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axios';
@@ -15,6 +16,18 @@ import EmptyState from '../components/common/EmptyState';
 import ProfileModal from '../components/profile/ProfileModal';
 import { useTheme } from '../contexts/ThemeContext';
 import DarkModeToggle from '../components/common/DarkModeToggle';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+
+// Branch options with full names (used across components)
+const BRANCHES = [
+  { value: 'ALL', label: 'All Branches' },
+  { value: 'CSE', label: 'Computer Science Engineering' },
+  { value: 'IT', label: 'Information Technology' },
+  { value: 'ENTC', label: 'Electronics & Telecommunication Engineering' },
+  { value: 'Mechanical', label: 'Mechanical Engineering' },
+  { value: 'Civil', label: 'Civil Engineering' },
+  { value: 'Electrical', label: 'Electrical Engineering' },
+];
 
 // Role-based dashboard for Campus Pulse
 // Supports: Student, Faculty, Admin roles
@@ -36,16 +49,32 @@ const Dashboard = () => {
   const [allUsers, setAllUsers] = useState([]);
   const [pendingFaculty, setPendingFaculty] = useState([]);
 
+  // Confirm dialog state
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, variant: 'danger', loading: false });
+  const openConfirm = (opts) => setConfirmDialog({ open: true, loading: false, variant: 'danger', ...opts });
+  const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false, loading: false }));
+
+  // Toast notification state
+  const [toast, setToast] = useState(null);
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
 
   // Notification state
   const [notifOpen, setNotifOpen] = useState(false);
+  const [notifClosing, setNotifClosing] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const [notifLoading, setNotifLoading] = useState(false);
-  const [readIds, setReadIds] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('notif_read') || '[]')); }
-    catch { return new Set(); }
-  });
+  const [readIds, setReadIds] = useState(new Set());
+  const [clearedIds, setClearedIds] = useState(new Set());
   const notifRef = useRef(null);
+  const notifCloseTimer = useRef(null);
+
+  // Helper: user-scoped localStorage key
+  const notifReadKey = user ? `notif_read_${user._id}` : null;
+  const notifClearedKey = user ? `notif_cleared_${user._id}` : null;
 
   // Helper: relative time
   const timeAgo = (dateStr) => {
@@ -153,13 +182,15 @@ const Dashboard = () => {
     }
   }, []);
 
-  const unreadCount = notifications.filter(n => !readIds.has(n.id)).length;
+  // Only count notifications that aren't cleared and aren't read
+  const visibleNotifications = notifications.filter(n => !clearedIds.has(n.id));
+  const unreadCount = visibleNotifications.filter(n => !readIds.has(n.id)).length;
 
   const markRead = (id) => {
     setReadIds(prev => {
       const next = new Set(prev);
       next.add(id);
-      localStorage.setItem('notif_read', JSON.stringify([...next]));
+      if (notifReadKey) localStorage.setItem(notifReadKey, JSON.stringify([...next]));
       return next;
     });
   };
@@ -168,14 +199,39 @@ const Dashboard = () => {
     const allIds = notifications.map(n => n.id);
     setReadIds(prev => {
       const next = new Set([...prev, ...allIds]);
-      localStorage.setItem('notif_read', JSON.stringify([...next]));
+      if (notifReadKey) localStorage.setItem(notifReadKey, JSON.stringify([...next]));
       return next;
     });
   };
 
+  const closeNotifPanel = () => {
+    setNotifClosing(true);
+    clearTimeout(notifCloseTimer.current);
+    notifCloseTimer.current = setTimeout(() => {
+      setNotifOpen(false);
+      setNotifClosing(false);
+    }, 150);
+  };
+
+  const clearAllNotifications = () => {
+    const allIds = notifications.map(n => n.id);
+    setClearedIds(prev => {
+      const next = new Set([...prev, ...allIds]);
+      if (notifClearedKey) localStorage.setItem(notifClearedKey, JSON.stringify([...next]));
+      return next;
+    });
+    // Also mark all as read
+    setReadIds(prev => {
+      const next = new Set([...prev, ...allIds]);
+      if (notifReadKey) localStorage.setItem(notifReadKey, JSON.stringify([...next]));
+      return next;
+    });
+    closeNotifPanel();
+  };
+
   const handleNotifClick = (notif) => {
     markRead(notif.id);
-    setNotifOpen(false);
+    closeNotifPanel();
     handleRouteChange(notif.route);
   };
 
@@ -210,22 +266,36 @@ const Dashboard = () => {
     }
   }, [navigate]);
 
+  // Load user-scoped read/cleared IDs from localStorage when user is known
+  useEffect(() => {
+    if (!user?._id) return;
+    const readKey = `notif_read_${user._id}`;
+    const clearedKey = `notif_cleared_${user._id}`;
+    try {
+      setReadIds(new Set(JSON.parse(localStorage.getItem(readKey) || '[]')));
+      setClearedIds(new Set(JSON.parse(localStorage.getItem(clearedKey) || '[]')));
+    } catch { /* ignore parse errors */ }
+  }, [user?._id]);
+
   // Fetch notifications once user is set (admin only)
   useEffect(() => {
     if (user?.role === 'admin') fetchNotifications();
   }, [user, fetchNotifications]);
+
+  // Cleanup close timer on unmount
+  useEffect(() => () => clearTimeout(notifCloseTimer.current), []);
 
   // Close notification panel on outside click
   useEffect(() => {
     if (!notifOpen) return;
     const handler = (e) => {
       if (notifRef.current && !notifRef.current.contains(e.target)) {
-        setNotifOpen(false);
+        closeNotifPanel();
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
-  }, [notifOpen]);
+  }, [notifOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchUsers = async () => {
     try {
@@ -243,32 +313,42 @@ const Dashboard = () => {
       await axiosInstance.put(`/admin/users/${id}/approve`);
       setAllUsers(prev => prev.map(u => u._id === id ? { ...u, isApproved: true } : u));
       setPendingFaculty(prev => prev.filter(u => u._id !== id));
-      alert("Faculty approved successfully");
+      showToast('Faculty approved successfully!');
     } catch (err) {
-      alert("Failed to approve faculty");
+      showToast('Failed to approve faculty.', 'error');
     }
   };
 
-  const handleReject = async (id) => {
-    if (!window.confirm("Are you sure you want to reject and delete this request?")) return;
-    try {
-      await axiosInstance.delete(`/admin/users/${id}`);
-      setAllUsers(prev => prev.filter(u => u._id !== id));
-      setPendingFaculty(prev => prev.filter(u => u._id !== id));
-      alert("Request rejected");
-    } catch (err) {
-      alert("Failed to reject request");
-    }
-  }
+  const handleReject = (id) => {
+    openConfirm({
+      title: 'Reject Request',
+      message: 'This will permanently delete the faculty request. This action cannot be undone.',
+      confirmLabel: 'Yes, Reject',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(d => ({ ...d, loading: true }));
+        try {
+          await axiosInstance.delete(`/admin/users/${id}`);
+          setAllUsers(prev => prev.filter(u => u._id !== id));
+          setPendingFaculty(prev => prev.filter(u => u._id !== id));
+          closeConfirm();
+          showToast('Request rejected and removed.');
+        } catch (err) {
+          closeConfirm();
+          showToast('Failed to reject request.', 'error');
+        }
+      },
+    });
+  };
 
   const openProfilePanel = () => setShowProfilePanel(true);
 
   const handleRegister = (eventId) => {
-    alert("Registration feature coming soon! You will be able to register for this event.");
+    showToast('Registration feature coming soon!');
   };
 
   const handleViewDetails = (eventId) => {
-    alert(`Viewing details for event ID: ${eventId}`);
+    handleRouteChange('Events');
   };
 
   // Data States
@@ -351,7 +431,11 @@ const Dashboard = () => {
     { name: 'Events', icon: Calendar },
     { name: 'Announcements', icon: Bell },
     { name: 'Gallery', icon: Image },
-    ...(user?.role === 'admin' ? [{ name: 'Settings', icon: Settings }] : [])
+    ...(user?.role === 'admin' ? [
+      { name: 'Recruitment', icon: BriefcaseBusiness },
+      { name: 'Approve Event', icon: FileCheck, badge: pendingFaculty.length > 0 ? pendingFaculty.length : null },
+      { name: 'User Management', icon: Users },
+    ] : [])
   ];
 
   if (loading || !user) return (
@@ -379,9 +463,9 @@ const Dashboard = () => {
     { name: 'Manage Events', icon: Calendar, subtitle: 'View and edit your events', path: '/faculty' },
     { name: 'Post Announcement', icon: Bell, subtitle: 'Share important updates', path: '/faculty' }
   ] : [
-    { name: 'Approve Events', icon: Award, subtitle: 'Review pending requests', path: '/admin/events' },
+    { name: 'Approve Events', icon: Award, subtitle: 'Review pending requests', action: 'Approve Event' },
     { name: 'System Settings', icon: Settings, subtitle: 'Configure portal settings', action: 'Settings' },
-    { name: 'User Management', icon: Users, subtitle: 'Manage users and roles', path: '/admin/users' },
+    { name: 'User Management', icon: Users, subtitle: 'Manage users and roles', action: 'User Management' },
     { name: 'Photo Gallery', icon: Image, subtitle: 'Browse event photo collections', action: 'Gallery' }
   ];
 
@@ -450,7 +534,14 @@ const Dashboard = () => {
                     style={isActive ? { background: 'linear-gradient(135deg, var(--accent-from, #3b82f6), var(--accent-to, #4f46e5))' } : {}}
                   >
                     <Icon size={20} />
-                    {(!sidebarCollapsed || mobileSidebarOpen) && <span className="font-medium">{item.name}</span>}
+                    {(!sidebarCollapsed || mobileSidebarOpen) && (
+                      <span className="font-medium flex-1 text-left">{item.name}</span>
+                    )}
+                    {(!sidebarCollapsed || mobileSidebarOpen) && item.badge && (
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${isActive ? 'bg-white/30 text-white' : 'bg-amber-500 text-white'}`}>
+                        {item.badge}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -547,11 +638,18 @@ const Dashboard = () => {
                 {/* Notifications */}
                 <div className="relative" ref={notifRef}>
                   <button
-                    onClick={() => { setNotifOpen(o => !o); if (!notifOpen) fetchNotifications(); }}
+                    onClick={() => {
+                      if (notifOpen || notifClosing) {
+                        closeNotifPanel();
+                      } else {
+                        setNotifOpen(true);
+                        fetchNotifications();
+                      }
+                    }}
                     className="relative p-2 hover:bg-slate-100 rounded-xl transition-colors"
                     aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
                   >
-                    <Bell size={20} className={notifOpen ? 'text-blue-600' : 'text-slate-600'} />
+                    <Bell size={20} className={(notifOpen || notifClosing) ? 'text-blue-600' : 'text-slate-600'} />
                     {unreadCount > 0 && (
                       <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold px-0.5" aria-hidden="true">
                         {unreadCount > 99 ? '99+' : unreadCount}
@@ -559,9 +657,9 @@ const Dashboard = () => {
                     )}
                   </button>
 
-                  {/* Notification Dropdown Panel */}
-                  {notifOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden animate-notifSlide">
+                  {/* Notification Dropdown Panel — stays mounted during close animation */}
+                  {(notifOpen || notifClosing) && (
+                    <div className={`absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden ${notifClosing ? 'animate-notifSlideOut' : 'animate-notifSlide'}`}>
                       {/* Panel Header */}
                       <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
                         <div className="flex items-center gap-2">
@@ -581,7 +679,16 @@ const Dashboard = () => {
                               <CheckCheck size={13} /> All read
                             </button>
                           )}
-                          <button onClick={() => setNotifOpen(false)} className="p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600">
+                          {visibleNotifications.length > 0 && (
+                            <button
+                              onClick={clearAllNotifications}
+                              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-semibold px-2 py-1 hover:bg-red-50 rounded-lg transition-colors"
+                              title="Clear all notifications"
+                            >
+                              <Trash2 size={13} /> Clear
+                            </button>
+                          )}
+                          <button onClick={closeNotifPanel} className="p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600">
                             <X size={16} />
                           </button>
                         </div>
@@ -594,15 +701,15 @@ const Dashboard = () => {
                             <div className="w-5 h-5 border-2 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
                             <span className="text-sm">Loading notifications…</span>
                           </div>
-                        ) : notifications.length === 0 ? (
+                        ) : visibleNotifications.length === 0 ? (
                           <div className="flex flex-col items-center justify-center py-12 text-slate-400">
                             <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mb-3">
                               <Bell size={22} className="text-slate-300" />
                             </div>
                             <p className="text-sm font-medium">All caught up!</p>
-                            <p className="text-xs mt-1">No new notifications</p>
+                            <p className="text-xs mt-1">No notifications</p>
                           </div>
-                        ) : notifications.map(notif => {
+                        ) : visibleNotifications.map(notif => {
                           const isUnread = !readIds.has(notif.id);
                           const typeConfig = {
                             event: { bg: 'bg-blue-100', text: 'text-blue-600', Icon: Calendar, label: 'Event' },
@@ -626,7 +733,7 @@ const Dashboard = () => {
                               {/* Content */}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-start justify-between gap-2">
-                                  <p className={`text-sm font-semibold text-slate-900 truncate leading-snug ${isUnread ? 'text-slate-900' : 'text-slate-700'}`}>
+                                  <p className={`text-sm font-semibold truncate leading-snug ${isUnread ? 'text-slate-900' : 'text-slate-500'}`}>
                                     {notif.title}
                                   </p>
                                   {isUnread && <span className="flex-shrink-0 w-2 h-2 bg-blue-500 rounded-full mt-1.5" />}
@@ -647,9 +754,9 @@ const Dashboard = () => {
                       </div>
 
                       {/* Panel Footer */}
-                      {notifications.length > 0 && (
+                      {visibleNotifications.length > 0 && (
                         <div className="px-4 py-2.5 border-t border-slate-100 bg-slate-50 text-center">
-                          <p className="text-xs text-slate-400">{notifications.length} total notification{notifications.length !== 1 ? 's' : ''}</p>
+                          <p className="text-xs text-slate-400">{visibleNotifications.length} notification{visibleNotifications.length !== 1 ? 's' : ''}</p>
                         </div>
                       )}
                     </div>
@@ -738,8 +845,8 @@ const Dashboard = () => {
                   </section>
                 )}
 
-                {/* Stats Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4" role="region" aria-label="Event statistics">
+                {/* Stats Cards — Events only */}
+                <div className="grid grid-cols-3 gap-3 md:gap-4" role="region" aria-label="Event statistics">
                   <StatsCard icon={Clock} label="Ongoing Events" count={stats.ongoing} iconBg="bg-amber-100" iconColor="text-amber-600" />
                   <StatsCard icon={Calendar} label="Upcoming Events" count={stats.upcoming} iconBg="bg-blue-100" iconColor="text-blue-600" />
                   <StatsCard icon={Users} label="Finished Events" count={stats.finished} iconBg="bg-emerald-100" iconColor="text-emerald-600" />
@@ -971,13 +1078,50 @@ const Dashboard = () => {
                     <ChevronRight size={14} />
                   </button>
                 </div>
+
+                {/* Admin Overview — below Gallery (admin only) */}
+                {user.role === 'admin' && (
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-5">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="w-1 h-5 bg-purple-500 rounded-full" aria-hidden="true" />
+                      <h3 className="font-bold text-slate-900 text-sm md:text-base">Admin Overview</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col items-center justify-center p-3 bg-purple-50 rounded-xl">
+                        <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mb-2">
+                          <Users size={16} className="text-purple-600" />
+                        </div>
+                        <span className="text-2xl font-bold text-slate-900">{allUsers.length}</span>
+                        <span className="text-xs text-slate-500 mt-0.5 text-center">Total Users</span>
+                      </div>
+                      <div className="flex flex-col items-center justify-center p-3 bg-red-50 rounded-xl">
+                        <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center mb-2">
+                          <FileCheck size={16} className="text-red-600" />
+                        </div>
+                        <span className="text-2xl font-bold text-slate-900">{pendingFaculty.length}</span>
+                        <span className="text-xs text-slate-500 mt-0.5 text-center">Pending Approvals</span>
+                      </div>
+                    </div>
+                    {pendingFaculty.length > 0 && (
+                      <button
+                        onClick={() => handleRouteChange('Approve Event')}
+                        className="mt-3 w-full px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl hover:shadow-lg hover:shadow-red-500/30 transition-all text-xs font-semibold flex items-center justify-center gap-2"
+                      >
+                        <FileCheck size={13} /> Review Approvals
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {activeRoute === 'Events' && <Events userRole={user.role} user={user} />}
           {activeRoute === 'Announcements' && <Announcements userRole={user.role} user={user} />}
-          {activeRoute === 'Gallery' && <GalleryView galleryEvents={galleryEvents} galleryLoading={galleryLoading} setGalleryEvents={setGalleryEvents} setGalleryLoading={setGalleryLoading} lightbox={lightbox} setLightbox={setLightbox} axiosInstance={axiosInstance} userRole={user.role} user={user} />}
+          {activeRoute === 'Gallery' && <GalleryView galleryEvents={galleryEvents} galleryLoading={galleryLoading} setGalleryEvents={setGalleryEvents} setGalleryLoading={setGalleryLoading} lightbox={lightbox} setLightbox={setLightbox} axiosInstance={axiosInstance} userRole={user.role} user={user} openConfirm={openConfirm} closeConfirm={closeConfirm} setConfirmDialog={setConfirmDialog} />}
+          {activeRoute === 'Recruitment' && <RecruitmentView axiosInstance={axiosInstance} user={user} openConfirm={openConfirm} closeConfirm={closeConfirm} setConfirmDialog={setConfirmDialog} showToast={showToast} />}
+          {activeRoute === 'Approve Event' && <FacultyRequestsView pendingFaculty={pendingFaculty} allUsers={allUsers} fetchUsers={fetchUsers} handleApprove={handleApprove} handleReject={handleReject} showToast={showToast} />}
+          {activeRoute === 'User Management' && <UserManagementView allUsers={allUsers} />}
           {activeRoute === 'Settings' && <SettingsView user={user} stats={stats} allUsers={allUsers} />}
         </main>
       </div>
@@ -996,6 +1140,34 @@ const Dashboard = () => {
           navigate('/login');
         }}
       />
+
+      {/* Global Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        variant={confirmDialog.variant}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel={confirmDialog.confirmLabel || 'Confirm'}
+        cancelLabel={confirmDialog.cancelLabel || 'Cancel'}
+        loading={confirmDialog.loading}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={closeConfirm}
+      />
+
+      {/* Toast notification */}
+      {toast && (
+        <div
+          className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[400] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl text-white text-sm font-semibold transition-all ${toast.type === 'error' ? 'bg-red-600' : 'bg-emerald-600'}`}
+          role="alert"
+          style={{ animation: 'cdlgSlide 0.25s ease-out' }}
+        >
+          {toast.type === 'error'
+            ? <AlertCircle size={16} />
+            : <CheckCircle size={16} />
+          }
+          {toast.msg}
+        </div>
+      )}
 
       <style jsx>{`
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
@@ -1443,21 +1615,30 @@ const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalle
   };
 
   /* ── Delete image ── */
-  const handleDeleteImage = async (eventId, publicId) => {
-    if (!window.confirm('Delete this photo?')) return;
-    setDeletingId(publicId);
-    try {
-      // publicId may contain slashes (Cloudinary folder/id) — encode it
-      await axiosInstance.delete(`/events/${eventId}/gallery/${encodeURIComponent(publicId)}`);
-      setGalleryEvents(prev => prev.map(ev => {
-        if (ev._id !== eventId) return ev;
-        return { ...ev, images: ev.images.filter(img => img.public_id !== publicId) };
-      }).filter(ev => ev.images.length > 0));
-    } catch (err) {
-      console.error('Delete image failed:', err);
-    } finally {
-      setDeletingId(null);
-    }
+  const handleDeleteImage = (eventId, publicId) => {
+    openConfirm({
+      title: 'Delete Photo',
+      message: 'This photo will be permanently deleted. This action cannot be undone.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(d => ({ ...d, loading: true }));
+        setDeletingId(publicId);
+        try {
+          await axiosInstance.delete(`/events/${eventId}/gallery/${encodeURIComponent(publicId)}`);
+          setGalleryEvents(prev => prev.map(ev => {
+            if (ev._id !== eventId) return ev;
+            return { ...ev, images: ev.images.filter(img => img.public_id !== publicId) };
+          }).filter(ev => ev.images.length > 0));
+          closeConfirm();
+        } catch (err) {
+          console.error('Delete image failed:', err);
+          closeConfirm();
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
   };
 
   if (galleryLoading) {
@@ -1634,6 +1815,531 @@ const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalle
               </div>
             </form>
           </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── Recruitment View (Admin) ─────────────────────────────────────────────────
+const RecruitmentView = ({ axiosInstance, user, openConfirm, closeConfirm, setConfirmDialog, showToast }) => {
+  const [recruitments, setRecruitments] = React.useState([]);
+  const [events, setEvents] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [tab, setTab] = React.useState('list'); // 'list' | 'create'
+  const [expandedId, setExpandedId] = React.useState(null);
+  const [applicants, setApplicants] = React.useState({});
+  const [loadingApplicants, setLoadingApplicants] = React.useState({});
+  const [form, setForm] = React.useState({ title: '', description: '', roleType: 'volunteer', branch: 'ALL', eventId: '', customRole: '' });
+  const [submitting, setSubmitting] = React.useState(false);
+  const [formError, setFormError] = React.useState('');
+
+  const roleTypes = ['volunteer', 'anchor', 'coordinator', 'technical', 'other'];
+  // BRANCHES is defined at module level
+
+  const fetchRecruitments = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await axiosInstance.get('/recruitments?status=all');
+      setRecruitments(res.data.data || []);
+    } catch { /* silent */ }
+    finally { setLoading(false); }
+  }, [axiosInstance]);
+
+  React.useEffect(() => {
+    fetchRecruitments();
+    axiosInstance.get('/events').then(r => setEvents(r.data.data || [])).catch(() => { });
+  }, [fetchRecruitments, axiosInstance]);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    if (!form.title || !form.description || !form.eventId) { setFormError('Title, description and event are required.'); return; }
+    if (form.roleType === 'other' && !form.customRole.trim()) { setFormError('Please specify a custom role name for "Other" role type.'); return; }
+    setSubmitting(true); setFormError('');
+    try {
+      const payload = { ...form, roleType: form.roleType === 'other' ? form.customRole.trim() : form.roleType };
+      await axiosInstance.post('/recruitments', payload);
+      showToast('Recruitment post created!');
+      setForm({ title: '', description: '', roleType: 'volunteer', branch: 'ALL', eventId: '', customRole: '' });
+      setTab('list');
+      fetchRecruitments();
+    } catch (err) {
+      setFormError(err.response?.data?.message || 'Failed to create recruitment post.');
+    } finally { setSubmitting(false); }
+  };
+
+  const handleDelete = (id) => {
+    openConfirm({
+      title: 'Delete Recruitment Post',
+      message: 'This will permanently delete this recruitment post and all its applicant data.',
+      confirmLabel: 'Delete',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(d => ({ ...d, loading: true }));
+        try {
+          await axiosInstance.delete(`/recruitments/${id}`);
+          setRecruitments(prev => prev.filter(r => r._id !== id));
+          closeConfirm();
+          showToast('Recruitment post deleted.');
+        } catch {
+          closeConfirm();
+          showToast('Failed to delete post.', 'error');
+        }
+      },
+    });
+  };
+
+  const toggleApplicants = async (id) => {
+    if (expandedId === id) { setExpandedId(null); return; }
+    setExpandedId(id);
+    if (applicants[id]) return;
+    setLoadingApplicants(p => ({ ...p, [id]: true }));
+    try {
+      const res = await axiosInstance.get(`/recruitments/${id}/applicants`);
+      setApplicants(p => ({ ...p, [id]: res.data.data?.applicants || [] }));
+    } catch { setApplicants(p => ({ ...p, [id]: [] })); }
+    finally { setLoadingApplicants(p => ({ ...p, [id]: false })); }
+  };
+
+  const updateApplicantStatus = async (recruitId, applicantId, status) => {
+    try {
+      await axiosInstance.patch(`/recruitments/${recruitId}/applicants/${applicantId}`, { status });
+      setApplicants(prev => ({
+        ...prev,
+        [recruitId]: prev[recruitId].map(a => a._id === applicantId ? { ...a, status } : a),
+      }));
+      showToast(`Applicant ${status} successfully.`);
+    } catch { showToast('Failed to update applicant status.', 'error'); }
+  };
+
+  const closeRecruit = async (id) => {
+    openConfirm({
+      title: 'Close Recruitment',
+      message: 'No more applications will be accepted for this post.',
+      confirmLabel: 'Close It',
+      variant: 'info',
+      onConfirm: async () => {
+        setConfirmDialog(d => ({ ...d, loading: true }));
+        try {
+          await axiosInstance.put(`/recruitments/${id}`, { status: 'closed' });
+          setRecruitments(prev => prev.map(r => r._id === id ? { ...r, status: 'closed' } : r));
+          closeConfirm();
+          showToast('Recruitment closed.');
+        } catch {
+          closeConfirm();
+          showToast('Failed to close recruitment.', 'error');
+        }
+      },
+    });
+  };
+
+  const statusBadge = (s) => s === 'open'
+    ? <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">Open</span>
+    : <span className="px-2.5 py-0.5 bg-slate-100 text-slate-500 text-xs font-bold rounded-full">Closed</span>;
+
+  const applicantBadge = (s) => {
+    const map = { selected: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-700', applied: 'bg-amber-100 text-amber-700' };
+    return <span className={`px-2 py-0.5 text-xs font-semibold rounded-full capitalize ${map[s] || map.applied}`}>{s}</span>;
+  };
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900">Recruitment Management</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Create volunteer/organizer roles for your events</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setTab('list')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${tab === 'list' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+          >
+            All Posts
+          </button>
+          <button
+            onClick={() => setTab('create')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 transition-all ${tab === 'create' ? 'bg-blue-600 text-white shadow' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+          >
+            <Plus size={15} /> Create New
+          </button>
+        </div>
+      </div>
+
+      {/* Create Form */}
+      {tab === 'create' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 md:p-6">
+          <h3 className="font-bold text-slate-900 mb-4">New Recruitment Post</h3>
+          {formError && (
+            <div className="flex items-center gap-2 mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
+              <AlertCircle size={15} /> {formError}
+            </div>
+          )}
+          <form onSubmit={handleCreate} className="space-y-4">
+            <div className="grid sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Title *</label>
+                <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none" placeholder="e.g. Stage Volunteers for Tech Fest" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Role Type</label>
+                <select value={form.roleType} onChange={e => setForm(f => ({ ...f, roleType: e.target.value, customRole: '' }))}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white capitalize">
+                  {roleTypes.map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
+                </select>
+                {form.roleType === 'other' && (
+                  <input
+                    value={form.customRole}
+                    onChange={e => setForm(f => ({ ...f, customRole: e.target.value }))}
+                    className="w-full mt-2 px-3 py-2.5 border border-blue-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-blue-50 placeholder-slate-400"
+                    placeholder="Enter specific role name (e.g. Stage Manager)…"
+                    autoFocus
+                  />
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Target Branch</label>
+                <select value={form.branch} onChange={e => setForm(f => ({ ...f, branch: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                  {BRANCHES.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Linked Event *</label>
+                <select value={form.eventId} onChange={e => setForm(f => ({ ...f, eventId: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                  <option value="">Choose an event…</option>
+                  {events.map(ev => <option key={ev._id} value={ev._id}>{ev.title}</option>)}
+                </select>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-semibold text-slate-500 uppercase mb-1">Description *</label>
+                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} rows={3}
+                  className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none"
+                  placeholder="What will volunteers do? Any requirements?" />
+              </div>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button type="button" onClick={() => setTab('list')}
+                className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-xl font-semibold text-sm hover:bg-slate-50 transition-colors">Cancel</button>
+              <button type="submit" disabled={submitting}
+                className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-semibold text-sm hover:shadow-lg transition-all disabled:opacity-60 flex items-center gap-2">
+                {submitting ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Creating…</> : 'Create Post'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Recruitment List */}
+      {tab === 'list' && (
+        loading ? (
+          <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>
+        ) : recruitments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
+            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
+              <BriefcaseBusiness size={30} className="text-blue-400" />
+            </div>
+            <h3 className="font-bold text-slate-700 text-lg mb-1">No Recruitment Posts Yet</h3>
+            <p className="text-slate-400 text-sm mb-4 text-center max-w-xs">Get started by creating your first volunteer or organizer role for an event.</p>
+            <button onClick={() => setTab('create')} className="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-semibold flex items-center gap-2 hover:bg-blue-700 transition-colors">
+              <Plus size={15} /> Create First Post
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {recruitments.map(rec => (
+              <div key={rec._id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                {/* Card Header */}
+                <div className="p-4 md:p-5 flex flex-col sm:flex-row items-start gap-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <h3 className="font-bold text-slate-900 text-base">{rec.title}</h3>
+                      {statusBadge(rec.status)}
+                      <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs font-semibold rounded-full capitalize">{rec.roleType}</span>
+                    </div>
+                    <p className="text-sm text-slate-500 mb-2 line-clamp-2">{rec.description}</p>
+                    <div className="flex flex-wrap gap-3 text-xs text-slate-500">
+                      <span className="flex items-center gap-1"><Calendar size={12} />{rec.event?.title || 'No event'}</span>
+                      <span className="flex items-center gap-1"><Users size={12} />{rec.branch}</span>
+                      <span className="flex items-center gap-1"><FileText size={12} />{rec.applicants?.length || 0} applicant(s)</span>
+                    </div>
+                  </div>
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                    <button
+                      onClick={() => toggleApplicants(rec._id)}
+                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                    >
+                      <Users size={13} /> Applicants
+                      <ChevronDown size={13} className={`transition-transform ${expandedId === rec._id ? 'rotate-180' : ''}`} />
+                    </button>
+                    {rec.status === 'open' && (
+                      <button onClick={() => closeRecruit(rec._id)} className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-semibold transition-colors">
+                        Close
+                      </button>
+                    )}
+                    <button onClick={() => handleDelete(rec._id)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors">
+                      <Trash2 size={13} /> Delete
+                    </button>
+                  </div>
+                </div>
+
+                {/* Applicants Panel */}
+                {expandedId === rec._id && (
+                  <div className="border-t border-slate-100 bg-slate-50 p-4">
+                    {loadingApplicants[rec._id] ? (
+                      <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-slate-200 border-t-blue-500 rounded-full animate-spin" /></div>
+                    ) : (applicants[rec._id] || []).length === 0 ? (
+                      <div className="flex flex-col items-center py-6 text-slate-400">
+                        <Users size={28} className="mb-2 text-slate-300" />
+                        <p className="text-sm font-medium">No applicants yet</p>
+                        <p className="text-xs">Applications will appear here once students apply.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <p className="text-xs font-semibold text-slate-500 uppercase mb-3">{(applicants[rec._id] || []).length} Applicant(s)</p>
+                        {(applicants[rec._id] || []).map(app => (
+                          <div key={app._id} className="bg-white rounded-xl p-3 border border-slate-100 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                            <div className="w-9 h-9 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">
+                              {app.student?.name?.charAt(0) || '?'}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-slate-900 text-sm">{app.student?.name || 'Unknown'}</p>
+                              <p className="text-xs text-slate-500">{app.student?.email} · {app.student?.branch}</p>
+                              {app.note && <p className="text-xs text-slate-400 mt-1 italic">"{app.note}"</p>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {applicantBadge(app.status)}
+                              {app.status === 'applied' && (
+                                <div className="flex gap-1">
+                                  <button
+                                    onClick={() => updateApplicantStatus(rec._id, app._id, 'selected')}
+                                    className="px-2.5 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-xs font-semibold transition-colors"
+                                  >Select</button>
+                                  <button
+                                    onClick={() => updateApplicantStatus(rec._id, app._id, 'rejected')}
+                                    className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-xs font-semibold transition-colors"
+                                  >Reject</button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )
+      )}
+    </div>
+  );
+};
+
+// ─── Faculty Requests View (Admin) ────────────────────────────────────────────
+const FacultyRequestsView = ({ pendingFaculty, allUsers, fetchUsers, handleApprove, handleReject }) => {
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900">Faculty Requests</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Review and approve pending faculty registration requests</p>
+        </div>
+        {pendingFaculty.length > 0 && (
+          <span className="px-3 py-1 bg-amber-100 text-amber-700 text-sm font-bold rounded-full">
+            {pendingFaculty.length} Pending
+          </span>
+        )}
+      </div>
+
+      {/* Empty State */}
+      {pendingFaculty.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
+          <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center mb-5">
+            <UserCheck size={38} className="text-emerald-400" />
+          </div>
+          <h3 className="font-bold text-slate-700 text-xl mb-2">All Clear!</h3>
+          <p className="text-slate-400 text-sm text-center max-w-xs leading-relaxed">
+            There are no pending faculty requests at the moment. New requests will appear here when faculty members register.
+          </p>
+          <div className="mt-5 flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-xl text-emerald-600 text-sm font-medium">
+            <CheckCircle size={16} />
+            All faculty accounts are approved
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3 md:space-y-4">
+          {pendingFaculty.map((request) => (
+            <div key={request._id} className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:shadow-md transition-all">
+              <div className="flex items-center gap-3 md:gap-4">
+                <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center font-bold text-lg flex-shrink-0">
+                  {request.name.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-base">{request.name}</h3>
+                  <div className="text-sm text-slate-500 space-y-0.5 mt-0.5">
+                    <p className="flex items-center gap-1.5"><Mail size={12} /> {request.email}</p>
+                    <p className="flex items-center gap-1.5"><Users size={12} /> {request.branch}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <span className="ml-auto sm:ml-0 px-2.5 py-1 bg-amber-50 text-amber-600 text-xs font-semibold rounded-full border border-amber-200">
+                  Pending
+                </span>
+                <button
+                  onClick={() => handleApprove(request._id)}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-green-500/10 text-green-600 hover:bg-green-500/20 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-1.5"
+                  aria-label={`Approve ${request.name}`}
+                >
+                  <Check size={15} /> Approve
+                </button>
+                <button
+                  onClick={() => handleReject(request._id)}
+                  className="flex-1 sm:flex-none px-4 py-2 bg-red-500/10 text-red-600 hover:bg-red-500/20 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-1.5"
+                  aria-label={`Reject ${request.name}`}
+                >
+                  <Trash2 size={15} /> Reject
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ─── User Management View (Admin) ────────────────────────────────────────────
+const UserManagementView = ({ allUsers }) => {
+  const [roleFilter, setRoleFilter] = React.useState('all');
+  const [branchFilter, setBranchFilter] = React.useState('ALL');
+  const [searchQuery, setSearchQuery] = React.useState('');
+
+  const filtered = React.useMemo(() => allUsers.filter(u => {
+    const matchRole = roleFilter === 'all' || u.role === roleFilter;
+    const matchBranch = branchFilter === 'ALL' || u.branch === branchFilter;
+    const matchSearch = !searchQuery ||
+      u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.email?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchRole && matchBranch && matchSearch;
+  }), [allUsers, roleFilter, branchFilter, searchQuery]);
+
+  const roleTabs = [
+    { key: 'all', label: 'All Users', count: allUsers.length },
+    { key: 'student', label: 'Students', count: allUsers.filter(u => u.role === 'student').length },
+    { key: 'faculty', label: 'Faculty', count: allUsers.filter(u => u.role === 'faculty').length },
+    { key: 'admin', label: 'Admin', count: allUsers.filter(u => u.role === 'admin').length },
+  ];
+
+  const roleStyle = {
+    student: 'bg-blue-100 text-blue-700',
+    faculty: 'bg-purple-100 text-purple-700',
+    admin: 'bg-red-100 text-red-700',
+  };
+
+  return (
+    <div className="space-y-5 animate-fadeIn">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900">User Management</h2>
+          <p className="text-sm text-slate-500 mt-0.5">{allUsers.length} total registered users</p>
+        </div>
+      </div>
+
+      {/* Role Filter Tabs */}
+      <div className="flex flex-wrap gap-1 bg-white rounded-xl p-1 shadow-sm border border-slate-200">
+        {roleTabs.map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setRoleFilter(tab.key)}
+            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${roleFilter === tab.key
+              ? 'bg-blue-600 text-white shadow'
+              : 'text-slate-600 hover:bg-slate-50'
+              }`}
+          >
+            {tab.label}
+            <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold ${roleFilter === tab.key ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+              }`}>
+              {tab.count}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Search + Branch Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+          <input
+            type="text"
+            placeholder="Search by name or email…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+          />
+        </div>
+        <select
+          value={branchFilter}
+          onChange={e => setBranchFilter(e.target.value)}
+          className="px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white min-w-[220px]"
+        >
+          {BRANCHES.map(b => <option key={b.value} value={b.value}>{b.label}</option>)}
+        </select>
+      </div>
+
+      <p className="text-xs text-slate-400 font-medium">{filtered.length} user{filtered.length !== 1 ? 's' : ''} shown</p>
+
+      {/* Users Grid */}
+      {filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
+          <Users size={36} className="text-slate-300 mb-3" />
+          <p className="text-slate-500 font-medium">No users found</p>
+          <p className="text-xs text-slate-400 mt-1">Try adjusting filters or search query</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+          {filtered.map(u => (
+            <div
+              key={u._id}
+              className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 hover:shadow-md transition-all flex items-start gap-3"
+            >
+              {u.profilePic?.url ? (
+                <img
+                  src={u.profilePic.url}
+                  alt={u.name}
+                  className="w-11 h-11 rounded-xl object-cover flex-shrink-0 shadow-sm"
+                />
+              ) : (
+                <div className="w-11 h-11 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center font-bold text-white text-base flex-shrink-0">
+                  {u.name?.charAt(0)?.toUpperCase() || '?'}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                  <p className="font-semibold text-slate-900 text-sm truncate">{u.name}</p>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full capitalize ${roleStyle[u.role] || 'bg-slate-100 text-slate-600'}`}>
+                    {u.role}
+                  </span>
+                  {u.role === 'faculty' && !u.isApproved && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Pending</span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                {u.branch && (
+                  <p className="text-xs text-slate-400 mt-0.5 truncate">
+                    {BRANCHES.find(b => b.value === u.branch)?.label || u.branch}
+                  </p>
+                )}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
