@@ -15,8 +15,19 @@ const EventRequests = () => {
         description: '',
         date: '',
         venue: '',
-        branch: 'all' // Default or fetch from user
+        branch: 'ALL' // Default or fetch from user
     });
+
+    const branches = [
+        { value: 'ALL', label: 'All Branches' },
+        { value: 'CSE', label: 'Computer Science Engineering' },
+        { value: 'IT', label: 'Information Technology' },
+        { value: 'ENTC', label: 'Electronics & Telecommunication Engineering' },
+        { value: 'Mechanical', label: 'Mechanical Engineering' },
+        { value: 'Civil', label: 'Civil Engineering' },
+        { value: 'Electrical', label: 'Electrical Engineering' },
+        { value: 'Automobile', label: 'Automobile Engineering' },
+    ];
 
     useEffect(() => {
         fetchRequests();
@@ -40,7 +51,7 @@ const EventRequests = () => {
             await axiosInstance.post('/event-requests', formData);
             alert("Request submitted successfully!");
             setShowModal(false);
-            setFormData({ title: '', description: '', date: '', venue: '', branch: 'all' });
+            setFormData({ title: '', description: '', date: '', venue: '', branch: 'ALL' });
             fetchRequests();
         } catch (error) {
             console.error("Failed to submit request", error);
@@ -160,6 +171,18 @@ const EventRequests = () => {
                                         placeholder="e.g. Auditorium"
                                     />
                                 </div>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Target Branch</label>
+                                <select
+                                    className="w-full px-4 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-blue-500 outline-none transition-all bg-white"
+                                    value={formData.branch}
+                                    onChange={e => setFormData({ ...formData, branch: e.target.value })}
+                                >
+                                    {branches.map(b => (
+                                        <option key={b.value} value={b.value}>{b.label}</option>
+                                    ))}
+                                </select>
                             </div>
                             <div className="flex gap-3 mt-8">
                                 <button
