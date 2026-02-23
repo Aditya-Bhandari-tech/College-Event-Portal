@@ -11,6 +11,19 @@ const Users = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [branchFilter, setBranchFilter] = useState("ALL");
+  const [sortOrder, setSortOrder] = useState("asc");
+
+  const branches = [
+    { value: 'ALL', label: 'All Branches' },
+    { value: 'CSE', label: 'Computer Science Engineering' },
+    { value: 'IT', label: 'Information Technology' },
+    { value: 'ENTC', label: 'Electronics & Telecommunication Engineering' },
+    { value: 'Mechanical', label: 'Mechanical Engineering' },
+    { value: 'Civil', label: 'Civil Engineering' },
+    { value: 'Electrical', label: 'Electrical Engineering' },
+    { value: 'Automobile', label: 'Automobile Engineering' },
+  ];
 
   const fetchUsers = async () => {
     try {
@@ -50,10 +63,18 @@ const Users = () => {
   };
 
 
-  const filteredUsers = users.filter(user =>
-    user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredUsers = users
+    .filter(user => {
+      const matchesSearch = (user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email?.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesBranch = branchFilter === "ALL" || user.branch === branchFilter;
+      return matchesSearch && matchesBranch;
+    })
+    .sort((a, b) => {
+      const nameA = a.name?.toLowerCase() || "";
+      const nameB = b.name?.toLowerCase() || "";
+      return sortOrder === "asc" ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+    });
 
   return (
     <div className="min-h-screen bg-[#f9f8f6] p-4 sm:p-6 md:p-8 font-sans">
@@ -65,17 +86,35 @@ const Users = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">User Management</h1>
         </div>
 
-        {/* Search Bar */}
-        <div className="bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex items-center gap-2 w-full sm:max-w-md">
-          <Search size={20} className="text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search users by name or email..."
-            className="flex-1 outline-none text-slate-700 min-w-0"
-            aria-label="Search users by name or email"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="flex flex-col sm:flex-row gap-4 mb-6 sm:mb-8">
+          <div className="bg-white p-3 sm:p-4 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2 flex-1 max-w-md">
+            <Search size={20} className="text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search users by name or email..."
+              className="flex-1 outline-none text-slate-700 min-w-0"
+              aria-label="Search users by name or email"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <select
+            value={branchFilter}
+            onChange={(e) => setBranchFilter(e.target.value)}
+            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+          >
+            {branches.map(b => (
+              <option key={b.value} value={b.value}>{b.label}</option>
+            ))}
+          </select>
+
+          <button
+            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+            className="px-4 py-2 bg-white border border-slate-200 rounded-xl text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+          >
+            {sortOrder === 'asc' ? 'Sort A-Z' : 'Sort Z-A'}
+          </button>
         </div>
 
         {loading ? <Loader /> : error ? <div className="text-red-500">{error}</div> : (

@@ -27,6 +27,7 @@ const BRANCHES = [
   { value: 'Mechanical', label: 'Mechanical Engineering' },
   { value: 'Civil', label: 'Civil Engineering' },
   { value: 'Electrical', label: 'Electrical Engineering' },
+  { value: 'Automobile', label: 'Automobile Engineering' },
 ];
 
 // Role-based dashboard for Campus Pulse
@@ -463,7 +464,6 @@ const Dashboard = () => {
     { name: 'Manage Events', icon: Calendar, subtitle: 'View and edit your events', path: '/faculty' },
     { name: 'Post Announcement', icon: Bell, subtitle: 'Share important updates', path: '/faculty' }
   ] : [
-    { name: 'Approve Events', icon: Award, subtitle: 'Review pending requests', action: 'Approve Event' },
     { name: 'System Settings', icon: Settings, subtitle: 'Configure portal settings', action: 'Settings' },
     { name: 'User Management', icon: Users, subtitle: 'Manage users and roles', action: 'User Management' },
     { name: 'Photo Gallery', icon: Image, subtitle: 'Browse event photo collections', action: 'Gallery' }
@@ -558,7 +558,14 @@ const Dashboard = () => {
                   return (
                     <button
                       key={action.name}
-                      onClick={() => { navigate(action.path); setMobileSidebarOpen(false); }}
+                      onClick={() => { 
+                        if (action.action) {
+                          handleRouteChange(action.action);
+                        } else {
+                          navigate(action.path);
+                        }
+                        setMobileSidebarOpen(false); 
+                      }}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800/50 hover:text-white ${sidebarCollapsed && !mobileSidebarOpen ? 'justify-center' : ''}`}
                     >
                       <Icon size={20} />
@@ -847,9 +854,9 @@ const Dashboard = () => {
 
                 {/* Stats Cards — Events only */}
                 <div className="grid grid-cols-3 gap-3 md:gap-4" role="region" aria-label="Event statistics">
-                  <StatsCard icon={Clock} label="Ongoing Events" count={stats.ongoing} iconBg="bg-amber-100" iconColor="text-amber-600" />
-                  <StatsCard icon={Calendar} label="Upcoming Events" count={stats.upcoming} iconBg="bg-blue-100" iconColor="text-blue-600" />
-                  <StatsCard icon={Users} label="Finished Events" count={stats.finished} iconBg="bg-emerald-100" iconColor="text-emerald-600" />
+                  <StatsCard icon={Clock} label="Ongoing Events" count={stats.ongoing} iconBg="bg-amber-100" iconColor="text-amber-600" onClick={() => handleRouteChange('Events')} />
+                  <StatsCard icon={Calendar} label="Upcoming Events" count={stats.upcoming} iconBg="bg-blue-100" iconColor="text-blue-600" onClick={() => handleRouteChange('Events')} />
+                  <StatsCard icon={Users} label="Finished Events" count={stats.finished} iconBg="bg-emerald-100" iconColor="text-emerald-600" onClick={() => handleRouteChange('Events')} />
                 </div>
 
                 {/* Happening Now */}
@@ -1296,9 +1303,13 @@ const Dashboard = () => {
   );
 };
 
-const StatsCard = ({ icon: Icon, label, count, iconBg, iconColor }) => {
+const StatsCard = ({ icon: Icon, label, count, iconBg, iconColor, onClick }) => {
   return (
-    <div className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-200 hover:shadow-md transition-all cursor-pointer group" role="status">
+    <div 
+      className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-200 hover:shadow-md transition-all cursor-pointer group" 
+      role="status"
+      onClick={onClick}
+    >
       <div className="flex items-center justify-between mb-3 md:mb-4">
         <div className={`w-10 h-10 md:w-12 md:h-12 ${iconBg} rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform`}>
           <Icon size={20} className={iconColor} />
@@ -2220,15 +2231,31 @@ const UserManagementView = ({ allUsers }) => {
   const [roleFilter, setRoleFilter] = React.useState('all');
   const [branchFilter, setBranchFilter] = React.useState('ALL');
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [sortOrder, setSortOrder] = React.useState('asc'); // 'asc' | 'desc'
 
-  const filtered = React.useMemo(() => allUsers.filter(u => {
-    const matchRole = roleFilter === 'all' || u.role === roleFilter;
-    const matchBranch = branchFilter === 'ALL' || u.branch === branchFilter;
-    const matchSearch = !searchQuery ||
-      u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchRole && matchBranch && matchSearch;
-  }), [allUsers, roleFilter, branchFilter, searchQuery]);
+  const filtered = React.useMemo(() => {
+    let result = allUsers.filter(u => {
+      const matchRole = roleFilter === 'all' || u.role === roleFilter;
+      const matchBranch = branchFilter === 'ALL' || u.branch === branchFilter;
+      const matchSearch = !searchQuery ||
+        u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        u.email?.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchRole && matchBranch && matchSearch;
+    });
+
+    // Apply sorting by name
+    result.sort((a, b) => {
+      const nameA = a.name?.toLowerCase() || '';
+      const nameB = b.name?.toLowerCase() || '';
+      if (sortOrder === 'asc') {
+        return nameA.localeCompare(nameB);
+      } else {
+        return nameB.localeCompare(nameA);
+      }
+    });
+
+    return result;
+  }, [allUsers, roleFilter, branchFilter, searchQuery, sortOrder]);
 
   const roleTabs = [
     { key: 'all', label: 'All Users', count: allUsers.length },
@@ -2251,6 +2278,12 @@ const UserManagementView = ({ allUsers }) => {
           <h2 className="text-xl md:text-2xl font-bold text-slate-900">User Management</h2>
           <p className="text-sm text-slate-500 mt-0.5">{allUsers.length} total registered users</p>
         </div>
+        <button 
+          onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+          className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+        >
+          {sortOrder === 'asc' ? 'Sort A-Z' : 'Sort Z-A'}
+        </button>
       </div>
 
       {/* Role Filter Tabs */}
