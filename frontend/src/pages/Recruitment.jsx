@@ -15,6 +15,12 @@ const Recruitment = () => {
     const [selectedRole, setSelectedRole] = useState(null);
     const [note, setNote] = useState('');
     const [activeTab, setActiveTab] = useState('openings');
+    const [toast, setToast] = useState(null);
+
+    const showToast = (msg, type = 'success') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3000);
+    };
 
     useEffect(() => {
         fetchRecruitments();
@@ -49,13 +55,13 @@ const Recruitment = () => {
         e.preventDefault();
         try {
             await axiosInstance.post(`/recruitments/${selectedRole._id}/apply`, { note });
-            alert("Application submitted successfully!");
+            showToast('Application submitted successfully!');
             setShowModal(false);
             setNote('');
-            fetchMyApplications(); // Refresh to show new application
+            fetchMyApplications();
         } catch (error) {
-            console.error("Failed to apply", error);
-            alert(error.response?.data?.message || "Failed to submit application");
+            console.error('Failed to apply', error);
+            showToast(error.response?.data?.message || 'Failed to submit application.', 'error');
         }
     };
 
@@ -89,6 +95,17 @@ const Recruitment = () => {
 
     return (
         <div className="min-h-screen bg-[#f9f8f6] p-4 sm:p-6 md:p-8 font-sans">
+            {/* Toast notification */}
+            {toast && (
+                <div
+                    className={`fixed top-6 left-1/2 -translate-x-1/2 z-[400] flex items-center gap-3 px-5 py-3 rounded-2xl shadow-2xl text-white text-sm font-semibold ${toast.type === 'error' ? 'bg-red-600' : 'bg-emerald-600'}`}
+                    role="alert"
+                    style={{ animation: 'cdlgSlide 0.25s ease-out' }}
+                >
+                    {toast.type === 'error' ? '✕' : '✓'} {toast.msg}
+                    <style>{`@keyframes cdlgSlide { from { opacity:0;transform:translate(-50%,-12px); } to { opacity:1;transform:translate(-50%,0); } }`}</style>
+                </div>
+            )}
             <div className="max-w-5xl mx-auto">
                 <div className="flex items-center gap-3 sm:gap-4 mb-6 sm:mb-8">
                     <button onClick={() => navigate('/student')} className="p-2 hover:bg-white rounded-full transition-colors" aria-label="Back to dashboard">
