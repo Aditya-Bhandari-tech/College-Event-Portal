@@ -32,6 +32,7 @@ const eventSchema = new mongoose.Schema(
       {
         public_id: String,
         url: String,
+        resource_type: { type: String, default: "image" },
       },
     ],
     registrations: [
