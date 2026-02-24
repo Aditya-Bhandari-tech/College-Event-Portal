@@ -751,8 +751,8 @@ const FacultyDashboard = () => {
                                                     </button>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
+                                        </div>
+                                    ))}
                                     {events.length === 0 && <EmptyState message="No events created yet" />}
                                 </div>
                             )}
