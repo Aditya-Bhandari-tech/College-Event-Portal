@@ -79,7 +79,10 @@ export const roleMiddleware = (...allowedRoles) => {
       });
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    const userRole = req.user.role ? req.user.role.toLowerCase() : "";
+    const isAllowed = allowedRoles.some(role => role.toLowerCase() === userRole);
+
+    if (!isAllowed) {
       return res.status(403).json({
         success: false,
         message: "Insufficient permissions",

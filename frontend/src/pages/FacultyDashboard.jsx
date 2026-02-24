@@ -46,8 +46,10 @@ const FacultyDashboard = () => {
     const [showRecruitmentModal, setShowRecruitmentModal] = useState(false);
     const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
     const [showApplicantsModal, setShowApplicantsModal] = useState(false);
+    const [showAttendeesModal, setShowAttendeesModal] = useState(false);
     const [showGalleryUploadModal, setShowGalleryUploadModal] = useState(false);
-    const [selectedItem, setSelectedItem] = useState(null); // For edit/view applicants
+    const [selectedItem, setSelectedItem] = useState(null); // For edit/view applicants/attendees
+    const [selectedEventAttendees, setSelectedEventAttendees] = useState([]);
 
     // Gallery
     const [galleryUploadEventId, setGalleryUploadEventId] = useState('');
@@ -640,6 +642,16 @@ const FacultyDashboard = () => {
                                                 <div className="flex flex-wrap gap-3 md:gap-4 mt-2 text-xs text-slate-500">
                                                     <span className="flex items-center gap-1"><Calendar size={14} /> {formatDate(event.date)}</span>
                                                     <span className="flex items-center gap-1"><Users size={14} /> {event.branch}</span>
+                                                    <button
+                                                        onClick={() => {
+                                                            setSelectedEventAttendees(event.registrations || []);
+                                                            setSelectedItem(event);
+                                                            setShowAttendeesModal(true);
+                                                        }}
+                                                        className="flex items-center gap-1 text-blue-600 hover:underline font-medium"
+                                                    >
+                                                        <Users size={14} /> View Attendees ({event.registrations?.length || 0})
+                                                    </button>
                                                 </div>
                                             </div>
                                             <div className="flex gap-2 w-full sm:w-auto">
@@ -1172,6 +1184,60 @@ const FacultyDashboard = () => {
                     />
                     <div className="absolute bottom-6 text-white/60 text-sm">
                         {lightbox.index + 1} / {lightbox.images.length}
+                    </div>
+                </div>
+            )}
+
+            {/* Attendees Modal */}
+            {showAttendeesModal && (
+                <div className="fixed inset-0 bg-black/50 z-[100] backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-fadeIn">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-blue-600 to-indigo-600">
+                            <div>
+                                <h2 className="text-white font-bold text-lg">Event Attendees</h2>
+                                <p className="text-blue-100 text-xs">{selectedItem?.title}</p>
+                            </div>
+                            <button onClick={() => setShowAttendeesModal(false)} className="text-white/70 hover:text-white hover:bg-white/10 p-1.5 rounded-xl transition-colors">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="p-6 max-h-[60vh] overflow-y-auto">
+                            {selectedEventAttendees && selectedEventAttendees.length > 0 ? (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left font-jakarta">
+                                        <thead className="text-xs font-bold text-slate-500 uppercase border-b border-slate-100">
+                                            <tr>
+                                                <th className="px-4 py-2">Name</th>
+                                                <th className="px-4 py-2">Email</th>
+                                                <th className="px-4 py-2">Branch</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {selectedEventAttendees.map((student, idx) => (
+                                                <tr key={student._id || idx} className="hover:bg-slate-50 transition-colors">
+                                                    <td className="px-4 py-3 text-sm font-medium text-slate-900">{student.name}</td>
+                                                    <td className="px-4 py-3 text-sm text-slate-600">{student.email}</td>
+                                                    <td className="px-4 py-3 text-sm text-slate-500">{student.branch}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <div className="text-center py-10">
+                                    <Users size={48} className="mx-auto text-slate-200 mb-3" />
+                                    <p className="text-slate-500 font-jakarta">No students have registered for this event yet.</p>
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+                            <button
+                                onClick={() => setShowAttendeesModal(false)}
+                                className="px-6 py-2 bg-white border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors text-sm font-jakarta"
+                            >
+                                Close
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
