@@ -452,17 +452,30 @@ const Dashboard = () => {
     return 'Good Evening';
   };
 
-  const navigation = [
-    { name: 'Dashboard', icon: Grid },
-    { name: 'Events', icon: Calendar },
-    { name: 'Announcements', icon: Bell },
-    { name: 'Gallery', icon: Image },
-    ...(user?.role === 'admin' ? [
-      { name: 'Recruitment', icon: BriefcaseBusiness },
-      { name: 'Approve Event', icon: FileCheck, badge: pendingFaculty.length > 0 ? pendingFaculty.length : null },
-      { name: 'User Management', icon: Users },
-    ] : [])
-  ];
+ const navigation = [
+  { name: 'Dashboard', icon: Grid },
+  { name: 'Events', icon: Calendar },
+  { name: 'Announcements', icon: Bell },
+  { name: 'Gallery', icon: Image },
+
+  // Faculty features
+  ...(user?.role?.toLowerCase() === 'faculty'
+    ? [{ name: 'Event Requests', icon: FileCheck }]
+    : []),
+
+  // Admin features
+  ...(user?.role?.toLowerCase() === 'admin'
+    ? [
+        { name: 'Recruitment', icon: BriefcaseBusiness },
+        {
+          name: 'Approve Event',
+          icon: FileCheck,
+          badge: pendingFaculty.length > 0 ? pendingFaculty.length : null,
+        },
+        { name: 'User Management', icon: Users },
+      ]
+    : []),
+];
 
   if (loading || !user) return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white" role="status" aria-label="Loading dashboard">

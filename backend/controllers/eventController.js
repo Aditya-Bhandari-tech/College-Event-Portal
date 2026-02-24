@@ -43,7 +43,7 @@ export const createEvent = async (req, res, next) => {
 export const getEvents = async (req, res, next) => {
   try {
     const events = await Event.find()
-      .populate("registrations", "name email branch")
+      .populate("registrations", "name email branch year phone")
       .sort({ date: 1 });
 
     if (events.length === 0) {
