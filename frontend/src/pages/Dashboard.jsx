@@ -464,9 +464,6 @@ const Dashboard = () => {
     { name: 'Events', icon: Calendar },
     { name: 'Announcements', icon: Bell },
     { name: 'Gallery', icon: Image },
-    ...(user?.role === 'student' ? [
-      { name: 'Event Requests', icon: FileCheck },
-    ] : []),
     ...(user?.role === 'admin' ? [
       { name: 'Recruitment', icon: BriefcaseBusiness },
       { name: 'Approve Event', icon: FileCheck, badge: pendingFaculty.length > 0 ? pendingFaculty.length : null },
@@ -491,7 +488,6 @@ const Dashboard = () => {
   );
 
   const quickActions = user.role === 'student' ? [
-    { name: 'Request Event', icon: UserPlus, subtitle: 'Submit a new event proposal', path: '/event-requests' },
     { name: 'Volunteer', icon: Hand, subtitle: 'Apply for volunteer roles', path: '/recruitment' },
     { name: 'My Applications', icon: FileText, subtitle: 'Track your event applications', path: '/recruitment' }
   ] : user.role === 'faculty' ? [
