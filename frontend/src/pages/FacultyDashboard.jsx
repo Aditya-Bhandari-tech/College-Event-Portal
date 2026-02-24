@@ -12,6 +12,9 @@ import EmptyState from '../components/common/EmptyState';
 import ProfileModal from '../components/profile/ProfileModal';
 import { useTheme } from '../contexts/ThemeContext';
 import DarkModeToggle from '../components/common/DarkModeToggle';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import AttendeesModal from '../components/specific/AttendeesModal';
 
 const FacultyDashboard = () => {
     const navigate = useNavigate();
@@ -442,6 +445,46 @@ const FacultyDashboard = () => {
     };
 
     // Handlers
+    const handleDownloadPDF = (event) => {
+        const doc = new jsPDF();
+
+        // Add Title
+        doc.setFontSize(20);
+        doc.setTextColor(59, 130, 246); // Blue-500
+        doc.text("Registered Students List", 14, 22);
+
+        // Add Event Info
+        doc.setFontSize(12);
+        doc.setTextColor(100);
+        doc.text(`Event: ${event.title}`, 14, 32);
+        doc.text(`Date: ${new Date(event.date).toLocaleDateString()}`, 14, 38);
+        doc.text(`Venue: ${event.venue}`, 14, 44);
+        doc.text(`Exported on: ${new Date().toLocaleDateString()}`, 14, 50);
+
+        // Add Table
+        const tableColumn = ["#", "Name", "Branch", "Year", "Mobile", "Email"];
+        const tableRows = (event.registrations || []).map((student, index) => [
+            index + 1,
+            student.name,
+            student.branch,
+            student.year || 'N/A',
+            student.phone || 'N/A',
+            student.email
+        ]);
+
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: 60,
+            theme: 'grid',
+            headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [245, 247, 250] },
+            margin: { top: 60 },
+        });
+
+        doc.save(`${event.title.replace(/\s+/g, '_')}_Attendees.pdf`);
+    };
+
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -1189,57 +1232,13 @@ const FacultyDashboard = () => {
             )}
 
             {/* Attendees Modal */}
-            {showAttendeesModal && (
-                <div className="fixed inset-0 bg-black/50 z-[100] backdrop-blur-sm flex items-center justify-center p-4">
-                    <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden animate-fadeIn">
-                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-blue-600 to-indigo-600">
-                            <div>
-                                <h2 className="text-white font-bold text-lg">Event Attendees</h2>
-                                <p className="text-blue-100 text-xs">{selectedItem?.title}</p>
-                            </div>
-                            <button onClick={() => setShowAttendeesModal(false)} className="text-white/70 hover:text-white hover:bg-white/10 p-1.5 rounded-xl transition-colors">
-                                <X size={18} />
-                            </button>
-                        </div>
-                        <div className="p-6 max-h-[60vh] overflow-y-auto">
-                            {selectedEventAttendees && selectedEventAttendees.length > 0 ? (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left font-jakarta">
-                                        <thead className="text-xs font-bold text-slate-500 uppercase border-b border-slate-100">
-                                            <tr>
-                                                <th className="px-4 py-2">Name</th>
-                                                <th className="px-4 py-2">Email</th>
-                                                <th className="px-4 py-2">Branch</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50">
-                                            {selectedEventAttendees.map((student, idx) => (
-                                                <tr key={student._id || idx} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="px-4 py-3 text-sm font-medium text-slate-900">{student.name}</td>
-                                                    <td className="px-4 py-3 text-sm text-slate-600">{student.email}</td>
-                                                    <td className="px-4 py-3 text-sm text-slate-500">{student.branch}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ) : (
-                                <div className="text-center py-10">
-                                    <Users size={48} className="mx-auto text-slate-200 mb-3" />
-                                    <p className="text-slate-500 font-jakarta">No students have registered for this event yet.</p>
-                                </div>
-                            )}
-                        </div>
-                        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
-                            <button
-                                onClick={() => setShowAttendeesModal(false)}
-                                className="px-6 py-2 bg-white border border-slate-200 rounded-xl text-slate-700 font-semibold hover:bg-slate-50 transition-colors text-sm font-jakarta"
-                            >
-                                Close
-                            </button>
-                        </div>
-                    </div>
-                </div>
+            {showAttendeesModal && selectedItem && (
+                <AttendeesModal
+                    event={selectedItem}
+                    onClose={() => { setShowAttendeesModal(false); setSelectedItem(null); }}
+                    userRole={user.role}
+                    onDownloadPDF={handleDownloadPDF}
+                />
             )}
 
             <ProfileModal

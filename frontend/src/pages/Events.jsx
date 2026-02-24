@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axiosInstance from '../api/axios';
-import { Calendar, MapPin, Search, Clock, Users, Plus, Edit2, Trash2, X, AlertCircle } from 'lucide-react';
+import { Calendar, MapPin, Search, Clock, Users, Plus, Edit2, Trash2, X, AlertCircle, FileText } from 'lucide-react';
 import Loader from '../components/common/Loader';
 import EmptyState from '../components/common/EmptyState';
 import Button from '../components/common/Button';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
+import AttendeesModal from '../components/specific/AttendeesModal';
 
 // Full branch name mapping
 const BRANCH_LABELS = {
@@ -191,6 +194,8 @@ const Events = ({ userRole, user, onRegister }) => {
     const [editingEvent, setEditingEvent] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
+    const [showAttendeesModal, setShowAttendeesModal] = useState(false);
+    const [selectedItem, setSelectedItem] = useState(null);
 
     const canManage = userRole === 'admin' || userRole === 'faculty';
 
@@ -254,6 +259,46 @@ const Events = ({ userRole, user, onRegister }) => {
                 event.createdBy === user?.id || event.createdBy?._id === user?.id;
         }
         return false;
+    };
+
+    const handleDownloadPDF = (event) => {
+        const doc = new jsPDF();
+
+        // Add Title
+        doc.setFontSize(20);
+        doc.setTextColor(59, 130, 246); // Blue-500
+        doc.text("Registered Students List", 14, 22);
+
+        // Add Event Info
+        doc.setFontSize(12);
+        doc.setTextColor(100);
+        doc.text(`Event: ${event.title}`, 14, 32);
+        doc.text(`Date: ${new Date(event.date).toLocaleDateString()}`, 14, 38);
+        doc.text(`Venue: ${event.venue}`, 14, 44);
+        doc.text(`Exported on: ${new Date().toLocaleDateString()}`, 14, 50);
+
+        // Add Table
+        const tableColumn = ["#", "Name", "Branch", "Year", "Mobile", "Email"];
+        const tableRows = (event.registrations || []).map((student, index) => [
+            index + 1,
+            student.name,
+            student.branch,
+            student.year || 'N/A',
+            student.phone || 'N/A',
+            student.email
+        ]);
+
+        doc.autoTable({
+            head: [tableColumn],
+            body: tableRows,
+            startY: 60,
+            theme: 'grid',
+            headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [245, 247, 250] },
+            margin: { top: 60 },
+        });
+
+        doc.save(`${event.title.replace(/\s+/g, '_')}_Attendees.pdf`);
     };
 
     const filteredEvents = getFilteredEvents();
@@ -413,6 +458,16 @@ const Events = ({ userRole, user, onRegister }) => {
                                             {event.registrations?.includes(user?._id) ? 'Registered' : 'Register'}
                                         </button>
                                     )}
+
+                                    {userRole !== 'student' && (
+                                        <button
+                                            onClick={() => { setSelectedItem(event); setShowAttendeesModal(true); }}
+                                            className="mt-4 w-full py-2 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <Users size={16} />
+                                            View Attendees ({event.registrations?.length || 0})
+                                        </button>
+                                    )}
                                 </div>
                             </article>
                         );
@@ -439,6 +494,15 @@ const Events = ({ userRole, user, onRegister }) => {
                     onConfirm={handleDelete}
                     onCancel={() => setDeleteTarget(null)}
                     loading={deleteLoading}
+                />
+            )}
+
+            {showAttendeesModal && selectedItem && (
+                <AttendeesModal
+                    event={selectedItem}
+                    onClose={() => { setShowAttendeesModal(false); setSelectedItem(null); }}
+                    userRole={userRole}
+                    onDownloadPDF={handleDownloadPDF}
                 />
             )}
         </div>

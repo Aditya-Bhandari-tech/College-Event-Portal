@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import bcrypt from "bcryptjs";  
+import bcrypt from "bcryptjs";
 
 const userSchema = new mongoose.Schema({
   name: {
@@ -38,28 +38,28 @@ const userSchema = new mongoose.Schema({
 
   year: {
     type: String,
-    enum: ["First Year", "Second Year", "Third Year"],
+    enum: ["First Year", "Second Year", "Third Year", "Fourth Year"],
     // only students need to specify year
-    required: function() {
+    required: function () {
       return this.role === "student";
     }
   },
 
   role: {
-  type: String,
-  enum: ["student", "faculty", "admin"],
-  default: "student"
-},
-isApproved: {
-  type: Boolean,
-  default: function() {
-    return this.role === "student";
+    type: String,
+    enum: ["student", "faculty", "admin"],
+    default: "student"
+  },
+  isApproved: {
+    type: Boolean,
+    default: function () {
+      return this.role === "student";
+    }
+  },
+  profilePic: {
+    public_id: String,
+    url: String,
   }
-},
-profilePic: {
-  public_id: String,
-  url: String,
-}
 
 
 });
