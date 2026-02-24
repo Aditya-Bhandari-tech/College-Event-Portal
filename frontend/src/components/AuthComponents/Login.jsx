@@ -6,6 +6,7 @@ import axios from 'axios';
 import GoogleAuthButton from './GoogleAuthButton';
 import { jwtDecode } from 'jwt-decode';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../../contexts/useAuth';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CSS KEYFRAMES  (injected once — zero JS overhead at runtime)
@@ -135,6 +136,7 @@ const FEATURES = [
 // ─────────────────────────────────────────────────────────────────────────────
 const Login = () => {
   const navigate = useNavigate();
+  const { login: authLogin, syncUser } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -149,17 +151,17 @@ const Login = () => {
     e.preventDefault();
     try {
       setLoading(true); setError('');
-      const res = await axios.post('http://localhost:5000/api/auth/login', formData);
-      if (res.data.token) {
-        localStorage.setItem('token', res.data.token);
-        localStorage.setItem('user', JSON.stringify(res.data.user));
-        const role = res.data.user.role;
-        navigate(role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student');
-      } else if (res.data.needsApproval) {
-        setError('Your account is pending admin approval.');
-      }
+      // Use authLogin so the context user state is updated immediately
+      const data = await authLogin(formData.email, formData.password);
+      const role = data.user.role;
+      navigate(role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student', { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+      const msg = err.response?.data?.message || 'Login failed. Please check your credentials.';
+      if (msg.toLowerCase().includes('approval')) {
+        setError('Your account is pending admin approval.');
+      } else {
+        setError(msg);
+      }
     } finally { setLoading(false); }
   };
 
@@ -174,10 +176,12 @@ const Login = () => {
         googleId: decoded.sub,
       });
       if (res.data.token) {
+        // Update context state so ProtectedRoute sees auth immediately
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
+        syncUser(); // sync AuthContext in-memory state from localStorage
         const role = res.data.user.role;
-        navigate(role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student');
+        navigate(role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student', { replace: true });
       } else if (res.data.needsProfile) {
         setError('No account found for this email. Please sign up first.');
       }
@@ -205,13 +209,13 @@ const Login = () => {
       />
 
       {/* ══════════════════════════════════════════════════════════════════
-          LEFT PANEL — Form
+          LEFT PANEL — Login Card
       ══════════════════════════════════════════════════════════════════ */}
       <div className="w-full lg:w-1/2 xl:w-[45%] relative z-10 flex items-center justify-center px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full max-w-sm"
+          className="w-full max-w-md"
         >
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
@@ -224,15 +228,55 @@ const Login = () => {
           </div>
 
           {/* Glass card */}
-          <div className="relative rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-8 shadow-2xl shadow-black/50 overflow-hidden transition-shadow duration-500 hover:shadow-black/70">
+          <div className="relative rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-xl shadow-2xl shadow-black/60 overflow-hidden transition-shadow duration-500 hover:shadow-indigo-950/60">
             {/* Top shimmer line */}
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent" />
+            {/* Bottom shimmer line */}
+            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
 
-            <div className="relative z-10">
-              <div className="mb-7">
-                <h2 className="text-2xl font-bold text-white mb-1">Welcome back</h2>
-                <p className="text-slate-500 text-sm">Sign in to your account</p>
-              </div>
+            {/* Decorative inner glow blobs */}
+            <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-indigo-600/10 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-16 -left-16 w-52 h-52 rounded-full bg-purple-600/8 blur-3xl pointer-events-none" />
+
+            {/* ── Header section ─────────────────────────────────────────── */}
+            <div className="px-8 pt-10 pb-8 text-center relative z-10">
+              {/* Logo badge */}
+              <motion.div
+                initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.5, delay: 0.2, type: 'spring', stiffness: 200 }}
+                className="mx-auto mb-6 w-20 h-20 rounded-2xl overflow-hidden ring-2 ring-indigo-500/30 shadow-xl shadow-indigo-500/20"
+              >
+                <img
+                  src="https://res.cloudinary.com/dashboard-gallery/image/upload/v1771658399/college-portal/profile-pics/c35hx5mpy0pmntbzprjw.jpg"
+                  alt="Campus Pulse"
+                  className="w-full h-full object-cover"
+                />
+              </motion.div>
+
+              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
+                {/* Status badge */}
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-xs font-medium mb-4">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                  Welcome back · Secure sign in
+                </div>
+
+                <h2 className="text-3xl font-extrabold text-white mb-2 leading-tight">
+                  Sign in to{' '}
+                  <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                    Campus Pulse
+                  </span>
+                </h2>
+                <p className="text-slate-400 text-sm leading-relaxed max-w-xs mx-auto">
+                  Pick up where you left off — events, clubs, and everything campus.
+                </p>
+              </motion.div>
+            </div>
+
+            {/* ── Divider ────────────────────────────────────────────────── */}
+            <div className="mx-8 border-t border-white/[0.07]" />
+
+            {/* ── CTA / Form section ─────────────────────────────────────── */}
+            <div className="px-8 py-8 relative z-10">
 
               {/* Error banner */}
               <AnimatePresence>
@@ -240,8 +284,8 @@ const Login = () => {
                   <motion.div
                     initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                     className={`px-4 py-3 rounded-2xl text-sm mb-5 border ${error.includes('approval')
-                        ? 'bg-amber-500/10 border-amber-500/25 text-amber-400'
-                        : 'bg-red-500/10 border-red-500/25 text-red-400'
+                      ? 'bg-amber-500/10 border-amber-500/25 text-amber-400'
+                      : 'bg-red-500/10 border-red-500/25 text-red-400'
                       }`}
                     role="alert"
                   >
@@ -250,20 +294,21 @@ const Login = () => {
                 )}
               </AnimatePresence>
 
-              {/* Google */}
-              <div className="mb-5">
-                <div className="rounded-2xl overflow-hidden ring-1 ring-white/10 hover:ring-indigo-500/40 transition-all duration-300">
+              {/* Google button — with outer glow ring */}
+              <div className="relative group mb-6">
+                <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-pink-500/30 opacity-0 group-hover:opacity-100 blur transition-all duration-500 pointer-events-none" />
+                <div className="relative rounded-2xl overflow-hidden ring-1 ring-white/10 group-hover:ring-indigo-500/40 transition-all duration-300">
                   <GoogleAuthButton onSuccess={handleGoogleSuccess} onError={handleGoogleError} text="signin_with" />
                 </div>
               </div>
 
               {/* Divider */}
-              <div className="relative mb-5">
+              <div className="relative mb-6">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-white/[0.08]" />
                 </div>
                 <div className="relative flex justify-center">
-                  <span className="px-3 text-slate-600 text-xs">or continue with email</span>
+                  <span className="px-3 bg-transparent text-slate-600 text-xs">or continue with email</span>
                 </div>
               </div>
 
@@ -312,24 +357,43 @@ const Login = () => {
                   </div>
                 </div>
 
+                {/* Submit */}
                 <button
                   type="submit" disabled={loading}
-                  className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold mt-2 transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-purple-500 text-white text-sm font-semibold mt-2 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Signing in…' : 'Sign in'}
                 </button>
               </form>
 
-              <p className="text-sm text-slate-500 text-center mt-5">
+              {/* Trust badges */}
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
+                className="flex items-center justify-center gap-4 mt-6"
+              >
+                {[
+                  { icon: CalendarCheck, label: 'All Events' },
+                  { icon: Users, label: '2,400+ users' },
+                  { icon: Zap, label: 'Instant Access' },
+                ].map(({ icon: Icon, label }) => (
+                  <div key={label} className="flex items-center gap-1.5 text-slate-500 text-xs">
+                    <Icon className="w-3.5 h-3.5 text-indigo-500/70" />
+                    <span>{label}</span>
+                  </div>
+                ))}
+              </motion.div>
+
+              {/* Sign up link */}
+              <p className="text-sm text-slate-500 text-center mt-6 pt-6 border-t border-white/[0.07]">
                 Don't have an account?{' '}
-                <Link to="/signup" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
-                  Sign up
+                <Link to="/signup" className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
+                  Sign up free
                 </Link>
               </p>
             </div>
           </div>
 
-          <div className="mt-6 flex justify-center">
+          <div className="mt-5 flex justify-center">
             <Link to="/" className="flex items-center gap-1.5 text-slate-600 hover:text-slate-400 text-sm transition-colors duration-200">
               <ArrowLeft className="w-3.5 h-3.5" /> Back to home
             </Link>

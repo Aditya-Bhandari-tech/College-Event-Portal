@@ -238,19 +238,17 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
+    // Load initial user from localStorage
     const storedUser = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
-
-    if (!storedUser || !token) {
-      navigate('/login');
-      return;
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        if (parsedUser.role === 'admin') fetchUsers();
+      } catch (_) { }
     }
 
-    // Set from localStorage immediately (fast render)
-    const parsedUser = JSON.parse(storedUser);
-    setUser(parsedUser);
-
-    // Then fetch fresh user from DB — ensures profilePic & all fields are up to date
+    // Fetch fresh user from server
     axiosInstance.get('/users/me')
       .then(res => {
         const freshUser = res.data?.data || res.data;
@@ -259,14 +257,9 @@ const Dashboard = () => {
           localStorage.setItem('user', JSON.stringify(freshUser));
         }
       })
-      .catch(() => {
-        // If /me fails, keep using cached localStorage user silently
-      });
-
-    if (parsedUser.role === 'admin') {
-      fetchUsers();
-    }
-  }, [navigate]);
+      .catch(() => { });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load user-scoped read/cleared IDs from localStorage when user is known
   useEffect(() => {
@@ -1184,7 +1177,7 @@ const Dashboard = () => {
         onLogout={() => {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          navigate('/login');
+          window.location.replace('/login'); // full reload — reliable logout
         }}
       />
 

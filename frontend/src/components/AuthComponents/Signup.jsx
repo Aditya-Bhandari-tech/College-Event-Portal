@@ -6,7 +6,7 @@ import GoogleAuthButton from './GoogleAuthButton';
 import RoleSelectionModal from './RoleSelectionModal';
 import { jwtDecode } from 'jwt-decode';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Eye, EyeOff, Shield, Users, CalendarCheck, ArrowLeft, XCircle, LogIn, MailWarning } from 'lucide-react';
+import { Shield, Users, CalendarCheck, ArrowLeft, XCircle, LogIn, MailWarning } from 'lucide-react';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CSS KEYFRAMES  (injected once — zero JS overhead at runtime)
@@ -186,38 +186,12 @@ const FEATURES = [
 // ─────────────────────────────────────────────────────────────────────────────
 const Signup = () => {
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ name: '', email: '', password: '' });
-  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [showRoleModal, setShowRoleModal] = useState(false);
   const [googleUserData, setGoogleUserData] = useState(null);
   const [emailExistsData, setEmailExistsData] = useState(null);
-
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError('');
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      setLoading(true); setError(''); setSuccessMessage('');
-      const res = await axiosInstance.post('/auth/register', formData);
-      if (res.data.message?.includes('approval')) {
-        setSuccessMessage(res.data.message);
-        setTimeout(() => navigate('/login'), 3000);
-      } else if (res.data.token) {
-        localStorage.setItem('token', res.data.token);
-        localStorage.setItem('user', JSON.stringify(res.data.user));
-        const role = res.data.user.role;
-        navigate(role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student');
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
-    } finally { setLoading(false); }
-  };
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
@@ -355,13 +329,13 @@ const Signup = () => {
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════
-          RIGHT PANEL — Form
+          RIGHT PANEL — Sign Up Card
       ══════════════════════════════════════════════════════════════════ */}
       <div className="w-full lg:w-1/2 xl:w-[45%] relative z-10 flex items-center justify-center px-6 py-12">
         <motion.div
           initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full max-w-sm"
+          className="w-full max-w-md"
         >
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2 mb-8">
@@ -374,16 +348,55 @@ const Signup = () => {
           </div>
 
           {/* Glass card */}
-          <div className="relative rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-xl p-8 shadow-2xl shadow-black/50 overflow-hidden transition-shadow duration-500 hover:shadow-black/70">
+          <div className="relative rounded-3xl border border-white/10 bg-white/[0.03] backdrop-blur-xl shadow-2xl shadow-black/60 overflow-hidden transition-shadow duration-500 hover:shadow-indigo-950/60">
             {/* Top shimmer line */}
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent" />
+            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent" />
+            {/* Bottom shimmer line */}
+            <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
 
-            <div className="relative z-10">
-              <div className="mb-7">
-                <h2 className="text-2xl font-bold text-white mb-1">Create account</h2>
-                <p className="text-slate-500 text-sm">Join Campus Pulse today</p>
-              </div>
+            {/* Decorative inner glow blobs */}
+            <div className="absolute -top-20 -right-20 w-64 h-64 rounded-full bg-indigo-600/10 blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-16 -left-16 w-52 h-52 rounded-full bg-purple-600/8 blur-3xl pointer-events-none" />
 
+            {/* ── Header section ─────────────────────────────────────────── */}
+            <div className="px-8 pt-10 pb-8 text-center relative z-10">
+              {/* Logo badge */}
+              <motion.div
+                initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                transition={{ duration: 0.5, delay: 0.2, type: 'spring', stiffness: 200 }}
+                className="mx-auto mb-6 w-20 h-20 rounded-2xl overflow-hidden ring-2 ring-indigo-500/30 shadow-xl shadow-indigo-500/20"
+              >
+                <img
+                  src="https://res.cloudinary.com/dashboard-gallery/image/upload/v1771658399/college-portal/profile-pics/c35hx5mpy0pmntbzprjw.jpg"
+                  alt="Campus Pulse"
+                  className="w-full h-full object-cover"
+                />
+              </motion.div>
+
+              <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}>
+                {/* Live badge */}
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-indigo-500/30 bg-indigo-500/10 text-indigo-300 text-xs font-medium mb-4">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                  Free to join · No credit card needed
+                </div>
+
+                <h2 className="text-3xl font-extrabold text-white mb-2 leading-tight">
+                  Join{' '}
+                  <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+                    Campus Pulse
+                  </span>
+                </h2>
+                <p className="text-slate-400 text-sm leading-relaxed max-w-xs mx-auto">
+                  One tap to access events, clubs, and everything happening on campus.
+                </p>
+              </motion.div>
+            </div>
+
+            {/* ── Divider ────────────────────────────────────────────────── */}
+            <div className="mx-8 border-t border-white/[0.07]" />
+
+            {/* ── CTA section ────────────────────────────────────────────── */}
+            <div className="px-8 py-8 relative z-10">
               {/* Error / Success banners */}
               <AnimatePresence>
                 {error && (
@@ -405,86 +418,43 @@ const Signup = () => {
                 )}
               </AnimatePresence>
 
-              {/* Google */}
-              <div className="mb-5">
-                <div className="rounded-2xl overflow-hidden ring-1 ring-white/10 hover:ring-indigo-500/40 transition-all duration-300">
+              {/* Google button — with outer glow ring */}
+              <div className="relative group">
+                {/* Glow effect behind button */}
+                <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-r from-indigo-500/30 via-purple-500/30 to-pink-500/30 opacity-0 group-hover:opacity-100 blur transition-all duration-500 pointer-events-none" />
+                <div className="relative rounded-2xl overflow-hidden ring-1 ring-white/10 group-hover:ring-indigo-500/40 transition-all duration-300">
                   <GoogleAuthButton onSuccess={handleGoogleSuccess} onError={handleGoogleError} text="signup_with" />
                 </div>
               </div>
 
-              {/* Divider */}
-              <div className="relative mb-5">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-white/[0.08]" />
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="px-3 bg-transparent text-slate-600 text-xs">or continue with email</span>
-                </div>
-              </div>
-
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Name */}
-                <div>
-                  <label htmlFor="name" className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Full Name</label>
-                  <input
-                    id="name" name="name" type="text" required
-                    value={formData.name} onChange={handleChange}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/30 transition-all duration-200"
-                    placeholder="John Doe"
-                  />
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label htmlFor="email" className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Email</label>
-                  <input
-                    id="email" name="email" type="email" required
-                    value={formData.email} onChange={handleChange}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/30 transition-all duration-200"
-                    placeholder="you@college.edu"
-                  />
-                </div>
-
-                {/* Password */}
-                <div>
-                  <label htmlFor="password" className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wider">Password</label>
-                  <div className="relative">
-                    <input
-                      id="password" name="password"
-                      type={showPassword ? 'text' : 'password'} required
-                      value={formData.password} onChange={handleChange}
-                      className="w-full px-4 pr-12 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/30 transition-all duration-200"
-                      placeholder="••••••••"
-                    />
-                    <button
-                      type="button" onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition p-1"
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
+              {/* Trust badges */}
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }}
+                className="flex items-center justify-center gap-4 mt-6"
+              >
+                {[
+                  { icon: Shield, label: 'Secure' },
+                  { icon: Users, label: '2,400+ users' },
+                  { icon: CalendarCheck, label: '50+ events' },
+                ].map(({ icon: Icon, label }) => (
+                  <div key={label} className="flex items-center gap-1.5 text-slate-500 text-xs">
+                    <Icon className="w-3.5 h-3.5 text-indigo-500/70" />
+                    <span>{label}</span>
                   </div>
-                </div>
+                ))}
+              </motion.div>
 
-                <button
-                  type="submit" disabled={loading}
-                  className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold mt-2 transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/25 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? 'Creating account…' : 'Create account'}
-                </button>
-              </form>
-
-              <p className="text-sm text-slate-500 text-center mt-5">
+              {/* Sign in link */}
+              <p className="text-sm text-slate-500 text-center mt-6 pt-6 border-t border-white/[0.07]">
                 Already have an account?{' '}
-                <Link to="/login" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+                <Link to="/login" className="text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
                   Sign in
                 </Link>
               </p>
             </div>
           </div>
 
-          <div className="mt-6 flex justify-center">
+          <div className="mt-5 flex justify-center">
             <Link to="/" className="flex items-center gap-1.5 text-slate-600 hover:text-slate-400 text-sm transition-colors duration-200">
               <ArrowLeft className="w-3.5 h-3.5" /> Back to home
             </Link>

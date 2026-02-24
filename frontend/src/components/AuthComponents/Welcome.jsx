@@ -7,7 +7,8 @@ import { motion, AnimatePresence, useScroll, useTransform, useSpring, useMotionT
 
 function Welcome() {
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(true);
+  // Animation plays only ONCE per browser session (tab lifetime)
+  const [isLoading, setIsLoading] = useState(() => !sessionStorage.getItem('introPlayed'));
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
     stiffness: 100,
@@ -16,6 +17,7 @@ function Welcome() {
   });
 
   const handleAnimationComplete = () => {
+    sessionStorage.setItem('introPlayed', '1'); // mark as played for this session
     setIsLoading(false);
   };
 
