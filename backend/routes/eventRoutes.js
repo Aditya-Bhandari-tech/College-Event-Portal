@@ -7,7 +7,8 @@ import {
   updateEvent,
   deleteEvent,
   uploadEventGallery,
-  deleteGalleryImage
+  deleteGalleryImage,
+  registerForEvent
 } from "../controllers/eventController.js";
 
 import {
@@ -58,6 +59,13 @@ router.delete(
   authMiddleware,
   roleMiddleware("faculty", "admin"),
   deleteGalleryImage
+);
+
+router.post(
+  "/:id/register",
+  authMiddleware,
+  roleMiddleware("student"),
+  registerForEvent
 );
 
 export default router;

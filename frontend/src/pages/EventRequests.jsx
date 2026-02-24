@@ -23,10 +23,10 @@ const EventRequests = () => {
         { value: 'CSE', label: 'Computer Science Engineering' },
         { value: 'IT', label: 'Information Technology' },
         { value: 'ENTC', label: 'Electronics & Telecommunication Engineering' },
-        { value: 'Mechanical', label: 'Mechanical Engineering' },
-        { value: 'Civil', label: 'Civil Engineering' },
-        { value: 'Electrical', label: 'Electrical Engineering' },
-        { value: 'Automobile', label: 'Automobile Engineering' },
+        { value: 'ME', label: 'Mechanical Engineering' },
+        { value: 'CE', label: 'Civil Engineering' },
+        { value: 'EE', label: 'Electrical Engineering' },
+        { value: 'AE', label: 'Automobile Engineering' },
     ];
 
     useEffect(() => {
@@ -60,14 +60,11 @@ const EventRequests = () => {
     };
 
     return (
-        <div className="min-h-screen bg-[#f9f8f6] p-4 sm:p-6 md:p-8 font-sans">
+        <div className="animate-fadeIn">
             <div className="max-w-5xl mx-auto">
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 sm:mb-8 gap-3 sm:gap-4">
                     <div className="flex items-center gap-3 sm:gap-4">
-                        <button onClick={() => navigate('/student')} className="p-2 hover:bg-white rounded-full transition-colors" aria-label="Back to dashboard">
-                            <ArrowLeft size={24} className="text-slate-600" />
-                        </button>
                         <h1 className="text-2xl sm:text-3xl font-bold text-slate-800">My Event Requests</h1>
                     </div>
                     <button

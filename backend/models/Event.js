@@ -29,11 +29,17 @@ const eventSchema = new mongoose.Schema(
     },
 
     images: [
-  {
-    public_id: String,
-    url: String,
-  },
-],
+      {
+        public_id: String,
+        url: String,
+      },
+    ],
+    registrations: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User",
+      },
+    ],
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
