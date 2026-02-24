@@ -12,6 +12,7 @@ import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axios';
 import Events from './Events';
 import Announcements from './Announcements';
+import EventRequests from './EventRequests';
 import EmptyState from '../components/common/EmptyState';
 import ProfileModal from '../components/profile/ProfileModal';
 import { useTheme } from '../contexts/ThemeContext';
@@ -24,10 +25,10 @@ const BRANCHES = [
   { value: 'CSE', label: 'Computer Science Engineering' },
   { value: 'IT', label: 'Information Technology' },
   { value: 'ENTC', label: 'Electronics & Telecommunication Engineering' },
-  { value: 'Mechanical', label: 'Mechanical Engineering' },
-  { value: 'Civil', label: 'Civil Engineering' },
-  { value: 'Electrical', label: 'Electrical Engineering' },
-  { value: 'Automobile', label: 'Automobile Engineering' },
+  { value: 'ME', label: 'Mechanical Engineering' },
+  { value: 'CE', label: 'Civil Engineering' },
+  { value: 'EE', label: 'Electrical Engineering' },
+  { value: 'AE', label: 'Automobile Engineering' },
 ];
 
 // Role-based dashboard for Campus Pulse
@@ -337,8 +338,39 @@ const Dashboard = () => {
 
   const openProfilePanel = () => setShowProfilePanel(true);
 
-  const handleRegister = (eventId) => {
-    showToast('Registration feature coming soon!');
+  const handleRegister = async (eventId) => {
+    try {
+      await axiosInstance.post(`/events/${eventId}/register`);
+      showToast('Successfully registered for the event!');
+      // Refresh events data
+      const eventsRes = await axiosInstance.get('/events');
+      setEvents(eventsRes.data.data || []);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Failed to register.', 'error');
+    }
+  };
+
+  // Re-define handleRegister with confirmation
+  const handleRegisterConfirm = (eventId) => {
+    openConfirm({
+      title: 'Confirm Registration',
+      message: 'Are you sure you want to register for this event? Your details will be shared with the event coordinator.',
+      confirmLabel: 'Register Now',
+      variant: 'primary',
+      onConfirm: async () => {
+        setConfirmDialog(d => ({ ...d, loading: true }));
+        try {
+          await axiosInstance.post(`/events/${eventId}/register`);
+          showToast('Successfully registered for the event!');
+          const eventsRes = await axiosInstance.get('/events');
+          setEvents(eventsRes.data.data || []);
+          closeConfirm();
+        } catch (err) {
+          closeConfirm();
+          showToast(err.response?.data?.message || 'Failed to register.', 'error');
+        }
+      },
+    });
   };
 
   const handleViewDetails = (eventId) => {
@@ -449,7 +481,6 @@ const Dashboard = () => {
   );
 
   const quickActions = user.role === 'student' ? [
-    { name: 'Request Event', icon: UserPlus, subtitle: 'Submit a new event proposal', path: '/event-requests' },
     { name: 'Volunteer', icon: Hand, subtitle: 'Apply for volunteer roles', path: '/recruitment' },
     { name: 'My Applications', icon: FileText, subtitle: 'Track your event applications', path: '/recruitment' }
   ] : user.role === 'faculty' ? [
@@ -505,7 +536,7 @@ const Dashboard = () => {
           </div>
 
           {/* Main Menu */}
-          <div className="flex-1 overflow-y-auto py-4 md:py-6">
+          <div className="flex-1 overflow-y-auto no-scrollbar py-4 md:py-6">
             <div className={`${sidebarCollapsed && !mobileSidebarOpen ? 'px-3' : 'px-4'} mb-4`}>
               {(!sidebarCollapsed || mobileSidebarOpen) && (
                 <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Main Menu</span>
@@ -573,9 +604,17 @@ const Dashboard = () => {
           {/* User Profile in Sidebar */}
           <div className="p-4 border-t border-slate-700/50">
             <div className={`flex items-center gap-3 p-3 rounded-xl bg-slate-800/50 ${sidebarCollapsed && !mobileSidebarOpen ? 'justify-center' : ''}`}>
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center font-bold text-sm shadow-lg flex-shrink-0">
-                {user.avatar}
-              </div>
+              {user.profilePic?.url ? (
+                <img
+                  src={user.profilePic.url}
+                  alt={user.name}
+                  className="w-10 h-10 rounded-full object-cover shadow-lg flex-shrink-0"
+                />
+              ) : (
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center font-bold text-sm shadow-lg flex-shrink-0">
+                  {user.name?.charAt(0).toUpperCase()}
+                </div>
+              )}
               {(!sidebarCollapsed || mobileSidebarOpen) && (
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-sm truncate">{user.name}</p>
@@ -938,7 +977,7 @@ const Dashboard = () => {
                               >
                                 View Details
                               </button>
-                              {user.role === 'student' && (
+                              {user.role?.toLowerCase() === 'student' && (
                                 <button
                                   onClick={() => handleRegister(event._id)}
                                   className="flex-1 px-3 md:px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/30 transition-all text-xs md:text-sm font-semibold"
@@ -1116,8 +1155,9 @@ const Dashboard = () => {
             </div>
           )}
 
-          {activeRoute === 'Events' && <Events userRole={user.role} user={user} />}
+          {activeRoute === 'Events' && <Events userRole={user.role} user={user} onRegister={handleRegisterConfirm} />}
           {activeRoute === 'Announcements' && <Announcements userRole={user.role} user={user} />}
+          {activeRoute === 'Event Requests' && <EventRequests />}
           {activeRoute === 'Gallery' && <GalleryView galleryEvents={galleryEvents} galleryLoading={galleryLoading} setGalleryEvents={setGalleryEvents} setGalleryLoading={setGalleryLoading} lightbox={lightbox} setLightbox={setLightbox} axiosInstance={axiosInstance} userRole={user.role} user={user} openConfirm={openConfirm} closeConfirm={closeConfirm} setConfirmDialog={setConfirmDialog} />}
           {activeRoute === 'Recruitment' && <RecruitmentView axiosInstance={axiosInstance} user={user} openConfirm={openConfirm} closeConfirm={closeConfirm} setConfirmDialog={setConfirmDialog} showToast={showToast} />}
           {activeRoute === 'Approve Event' && <FacultyRequestsView pendingFaculty={pendingFaculty} allUsers={allUsers} fetchUsers={fetchUsers} handleApprove={handleApprove} handleReject={handleReject} showToast={showToast} />}

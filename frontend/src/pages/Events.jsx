@@ -180,7 +180,7 @@ const EventModal = ({ event, onClose, onSaved, userRole }) => {
 /* ═══════════════════════════════════════════════
    Main Events Component
 ════════════════════════════════════════════════ */
-const Events = ({ userRole, user }) => {
+const Events = ({ userRole, user, onRegister }) => {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');  // default: all
@@ -331,9 +331,32 @@ const Events = ({ userRole, user }) => {
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                                     />
                                     {/* Status badge */}
-                                    <span className={`absolute top-3 left-3 px-2.5 py-1 text-xs font-bold rounded-full shadow ${isUpcoming ? 'bg-blue-500 text-white' : 'bg-slate-500 text-white'}`}>
-                                        {isUpcoming ? 'Upcoming' : 'Completed'}
-                                    </span>
+                                    {(() => {
+                                        const eventDate = new Date(event.date);
+                                        const now = new Date();
+                                        const isToday = eventDate.toDateString() === now.toDateString();
+
+                                        if (isToday) {
+                                            return (
+                                                <span className="absolute top-3 left-3 px-2.5 py-1 text-xs font-bold rounded-full shadow bg-emerald-500 text-white flex items-center gap-1.5">
+                                                    <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                                                    Ongoing
+                                                </span>
+                                            );
+                                        }
+                                        if (eventDate > now) {
+                                            return (
+                                                <span className="absolute top-3 left-3 px-2.5 py-1 text-xs font-bold rounded-full shadow bg-blue-500 text-white">
+                                                    Upcoming
+                                                </span>
+                                            );
+                                        }
+                                        return (
+                                            <span className="absolute top-3 left-3 px-2.5 py-1 text-xs font-bold rounded-full shadow bg-slate-500 text-white">
+                                                Completed
+                                            </span>
+                                        );
+                                    })()}
 
                                     {/* Edit/Delete buttons */}
                                     {canEdit && (
@@ -378,12 +401,16 @@ const Events = ({ userRole, user }) => {
                                         </div>
                                     </div>
 
-                                    {userRole === 'student' && isUpcoming && (
+                                    {userRole?.toLowerCase() === 'student' && isUpcoming && (
                                         <button
-                                            onClick={() => alert('Registration feature coming soon!')}
-                                            className="mt-4 w-full py-2 bg-blue-50 text-blue-600 rounded-xl font-semibold text-sm hover:bg-blue-100 transition-colors"
+                                            onClick={() => onRegister(event._id)}
+                                            disabled={event.registrations?.includes(user?._id)}
+                                            className={`mt-4 w-full py-2 rounded-xl font-semibold text-sm transition-colors ${event.registrations?.includes(user?._id)
+                                                ? 'bg-green-50 text-green-600 cursor-not-allowed'
+                                                : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                                                }`}
                                         >
-                                            Register
+                                            {event.registrations?.includes(user?._id) ? 'Registered' : 'Register'}
                                         </button>
                                     )}
                                 </div>

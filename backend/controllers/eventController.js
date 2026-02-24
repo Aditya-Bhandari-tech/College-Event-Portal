@@ -42,7 +42,9 @@ export const createEvent = async (req, res, next) => {
 // GET ALL EVENTS (PUBLIC)
 export const getEvents = async (req, res, next) => {
   try {
-    const events = await Event.find().sort({ date: 1 });
+    const events = await Event.find()
+      .populate("registrations", "name email branch")
+      .sort({ date: 1 });
 
     if (events.length === 0) {
       return sendSuccess(res, "No events right now", [], 200);
@@ -133,8 +135,8 @@ export const deleteEvent = async (req, res, next) => {
 
     return next(error);
   }
-};  
-  export const uploadEventGallery = async (req, res) => {
+};
+export const uploadEventGallery = async (req, res) => {
   try {
     // Validate MongoDB ObjectId
     if (!isValidObjectId(req.params.id)) {
@@ -152,7 +154,7 @@ export const deleteEvent = async (req, res, next) => {
         message: "Event not found",
       });
     }
-  
+
     // Validate files uploaded
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({
@@ -199,9 +201,9 @@ export const deleteEvent = async (req, res, next) => {
       message: error.message,
     });
   }
-  };
+};
 
-  export const deleteGalleryImage = async (req, res) => {
+export const deleteGalleryImage = async (req, res) => {
   try {
     const { eventId, publicId } = req.params;
 
@@ -256,3 +258,38 @@ export const deleteEvent = async (req, res, next) => {
     });
   }
 };
+
+// REGISTER FOR EVENT (STUDENT)
+export const registerForEvent = async (req, res, next) => {
+  try {
+    const event = await Event.findById(req.params.id);
+
+    if (!event) {
+      return sendError(res, "Event not found", 404);
+    }
+
+    // Check if event is in the past
+    if (new Date(event.date) < new Date()) {
+      return sendError(res, "Cannot register for past events", 400);
+    }
+
+    // Check if already registered
+    if (event.registrations.includes(req.user._id)) {
+      return sendError(res, "You are already registered for this event", 400);
+    }
+
+    event.registrations.push(req.user._id);
+    await event.save();
+
+    return sendSuccess(res, "Registered successfully", event, 200);
+  } catch (error) {
+    console.error("Register For Event Error:", error);
+
+    if (error.name === "CastError") {
+      return sendError(res, "Invalid event id", 400);
+    }
+
+    return next(error);
+  }
+};
+
