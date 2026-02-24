@@ -184,6 +184,7 @@ export const uploadEventGallery = async (req, res) => {
     const images = req.files.map(file => ({
       public_id: file.filename,
       url: file.path,
+      resource_type: file.mimetype.startsWith("video/") ? "video" : "image"
     }));
 
     event.images.push(...images);

@@ -5,7 +5,7 @@ import Loader from '../components/common/Loader';
 import EmptyState from '../components/common/EmptyState';
 import Button from '../components/common/Button';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import AttendeesModal from '../components/specific/AttendeesModal';
 
 // Full branch name mapping
@@ -288,7 +288,7 @@ const Events = ({ userRole, user, onRegister }) => {
             student.email
         ]);
 
-        doc.autoTable({
+        autoTable(doc, {
             head: [tableColumn],
             body: tableRows,
             startY: 60,

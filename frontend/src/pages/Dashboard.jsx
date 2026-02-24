@@ -18,6 +18,8 @@ import ProfileModal from '../components/profile/ProfileModal';
 import { useTheme } from '../contexts/ThemeContext';
 import DarkModeToggle from '../components/common/DarkModeToggle';
 import ConfirmDialog from '../components/common/ConfirmDialog';
+import RecruitmentCard from '../components/specific/RecruitmentCard';
+import GalleryMediaGrid from '../components/specific/GalleryMediaGrid';
 
 // Branch options with full names (used across components)
 const BRANCHES = [
@@ -50,6 +52,7 @@ const Dashboard = () => {
   // Admin Data
   const [allUsers, setAllUsers] = useState([]);
   const [pendingFaculty, setPendingFaculty] = useState([]);
+  const [pendingEventRequests, setPendingEventRequests] = useState([]);
 
   // Confirm dialog state
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, variant: 'danger', loading: false });
@@ -244,7 +247,10 @@ const Dashboard = () => {
       try {
         const parsedUser = JSON.parse(storedUser);
         setUser(parsedUser);
-        if (parsedUser.role === 'admin') fetchUsers();
+        if (parsedUser.role === 'admin') {
+          fetchUsers();
+          fetchEventRequests();
+        }
       } catch (_) { }
     }
 
@@ -300,6 +306,16 @@ const Dashboard = () => {
       setPendingFaculty(usersData.filter(u => u.role === 'faculty' && !u.isApproved));
     } catch (error) {
       console.error("Failed to fetch users", error);
+    }
+  };
+
+  const fetchEventRequests = async () => {
+    try {
+      const response = await axiosInstance.get('/event-requests');
+      const requestsData = response.data.data || [];
+      setPendingEventRequests(requestsData.filter(r => r.status === 'pending'));
+    } catch (error) {
+      console.error("Failed to fetch event requests", error);
     }
   };
 
@@ -452,30 +468,34 @@ const Dashboard = () => {
     return 'Good Evening';
   };
 
- const navigation = [
-  { name: 'Dashboard', icon: Grid },
-  { name: 'Events', icon: Calendar },
-  { name: 'Announcements', icon: Bell },
-  { name: 'Gallery', icon: Image },
+  const navigation = [
+    { name: 'Dashboard', icon: Grid },
+    { name: 'Events', icon: Calendar },
+    { name: 'Announcements', icon: Bell },
+    { name: 'Gallery', icon: Image },
 
-  // Faculty features
-  ...(user?.role?.toLowerCase() === 'faculty'
-    ? [{ name: 'Event Requests', icon: FileCheck }]
-    : []),
+    // Faculty features
+    ...(user?.role?.toLowerCase() === 'faculty'
+      ? [{ name: 'Event Requests', icon: FileCheck }]
+      : []),
 
-  // Admin features
-  ...(user?.role?.toLowerCase() === 'admin'
-    ? [
+    // Admin features
+    ...(user?.role?.toLowerCase() === 'admin'
+      ? [
         { name: 'Recruitment', icon: BriefcaseBusiness },
         {
           name: 'Approve Event',
           icon: FileCheck,
+          badge: pendingEventRequests.length > 0 ? pendingEventRequests.length : null,
+        },
+        {
+          name: 'Faculty Requests',
+          icon: UserCheck,
           badge: pendingFaculty.length > 0 ? pendingFaculty.length : null,
         },
-        { name: 'User Management', icon: Users },
       ]
-    : []),
-];
+      : []),
+  ];
 
   if (loading || !user) return (
     <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white" role="status" aria-label="Loading dashboard">
@@ -501,8 +521,8 @@ const Dashboard = () => {
     { name: 'Manage Events', icon: Calendar, subtitle: 'View and edit your events', path: '/faculty' },
     { name: 'Post Announcement', icon: Bell, subtitle: 'Share important updates', path: '/faculty' }
   ] : [
-    { name: 'System Settings', icon: Settings, subtitle: 'Configure portal settings', action: 'Settings' },
     { name: 'User Management', icon: Users, subtitle: 'Manage users and roles', action: 'User Management' },
+    { name: 'System Settings', icon: Settings, subtitle: 'Configure portal settings', action: 'Settings' },
     { name: 'Photo Gallery', icon: Image, subtitle: 'Browse event photo collections', action: 'Gallery' }
   ];
 
@@ -1139,7 +1159,10 @@ const Dashboard = () => {
                       <h3 className="font-bold text-slate-900 text-sm md:text-base">Admin Overview</h3>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
-                      <div className="flex flex-col items-center justify-center p-3 bg-purple-50 rounded-xl">
+                      <div
+                        onClick={() => handleRouteChange('User Management')}
+                        className="flex flex-col items-center justify-center p-3 bg-purple-50 rounded-xl cursor-pointer hover:bg-purple-100 transition-colors border border-transparent hover:border-purple-200"
+                      >
                         <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mb-2">
                           <Users size={16} className="text-purple-600" />
                         </div>
@@ -1154,12 +1177,20 @@ const Dashboard = () => {
                         <span className="text-xs text-slate-500 mt-0.5 text-center">Pending Approvals</span>
                       </div>
                     </div>
-                    {pendingFaculty.length > 0 && (
+                    {pendingEventRequests.length > 0 && (
                       <button
                         onClick={() => handleRouteChange('Approve Event')}
-                        className="mt-3 w-full px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl hover:shadow-lg hover:shadow-red-500/30 transition-all text-xs font-semibold flex items-center justify-center gap-2"
+                        className="mt-3 w-full px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-500 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/30 transition-all text-xs font-semibold flex items-center justify-center gap-2"
                       >
-                        <FileCheck size={13} /> Review Approvals
+                        <FileCheck size={13} /> Review Events ({pendingEventRequests.length})
+                      </button>
+                    )}
+                    {pendingFaculty.length > 0 && (
+                      <button
+                        onClick={() => handleRouteChange('Faculty Requests')}
+                        className="mt-2 w-full px-4 py-2 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-xl hover:shadow-lg hover:shadow-red-500/30 transition-all text-xs font-semibold flex items-center justify-center gap-2"
+                      >
+                        <UserCheck size={13} /> Review Faculty ({pendingFaculty.length})
                       </button>
                     )}
                   </div>
@@ -1173,7 +1204,8 @@ const Dashboard = () => {
           {activeRoute === 'Event Requests' && <EventRequests />}
           {activeRoute === 'Gallery' && <GalleryView galleryEvents={galleryEvents} galleryLoading={galleryLoading} setGalleryEvents={setGalleryEvents} setGalleryLoading={setGalleryLoading} lightbox={lightbox} setLightbox={setLightbox} axiosInstance={axiosInstance} userRole={user.role} user={user} openConfirm={openConfirm} closeConfirm={closeConfirm} setConfirmDialog={setConfirmDialog} />}
           {activeRoute === 'Recruitment' && <RecruitmentView axiosInstance={axiosInstance} user={user} openConfirm={openConfirm} closeConfirm={closeConfirm} setConfirmDialog={setConfirmDialog} showToast={showToast} />}
-          {activeRoute === 'Approve Event' && <FacultyRequestsView pendingFaculty={pendingFaculty} allUsers={allUsers} fetchUsers={fetchUsers} handleApprove={handleApprove} handleReject={handleReject} showToast={showToast} />}
+          {activeRoute === 'Approve Event' && <EventApprovalsView pendingEventRequests={pendingEventRequests} fetchEventRequests={fetchEventRequests} showToast={showToast} openConfirm={openConfirm} closeConfirm={closeConfirm} setConfirmDialog={setConfirmDialog} />}
+          {activeRoute === 'Faculty Requests' && <FacultyRequestsView pendingFaculty={pendingFaculty} allUsers={allUsers} fetchUsers={fetchUsers} handleApprove={handleApprove} handleReject={handleReject} showToast={showToast} />}
           {activeRoute === 'User Management' && <UserManagementView allUsers={allUsers} />}
           {activeRoute === 'Settings' && <SettingsView user={user} stats={stats} allUsers={allUsers} />}
         </main>
@@ -1334,12 +1366,22 @@ const Dashboard = () => {
               </button>
             </>
           )}
-          <img
-            src={lightbox.images[lightbox.index]?.url || lightbox.images[lightbox.index]}
-            alt={`Gallery image ${lightbox.index + 1}`}
-            className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          />
+          {lightbox.images[lightbox.index]?.resource_type === 'video' ? (
+            <video
+              src={lightbox.images[lightbox.index]?.url}
+              controls
+              autoPlay
+              className="max-w-[90vw] max-h-[85vh] rounded-lg shadow-2xl outline-none"
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <img
+              src={lightbox.images[lightbox.index]?.url || lightbox.images[lightbox.index]}
+              alt={`Gallery item ${lightbox.index + 1}`}
+              className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
           <div className="absolute bottom-6 text-white/60 text-sm">
             {lightbox.index + 1} / {lightbox.images.length}
           </div>
@@ -1620,6 +1662,7 @@ const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalle
   const [uploading, setUploading] = React.useState(false);
   const [uploadError, setUploadError] = React.useState('');
   const [deletingId, setDeletingId] = React.useState(null);
+  const [generalGallery, setGeneralGallery] = React.useState([]);
   const fileInputRef = React.useRef(null);
 
   const canManage = userRole === 'admin' || userRole === 'faculty';
@@ -1628,10 +1671,14 @@ const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalle
     const fetchGallery = async () => {
       setGalleryLoading(true);
       try {
-        const res = await axiosInstance.get('/events');
-        const evts = res.data.data || [];
+        const [eventsRes, generalRes] = await Promise.all([
+          axiosInstance.get('/events'),
+          axiosInstance.get('/gallery')
+        ]);
+        const evts = eventsRes.data.data || [];
         setAllEvents(evts);
         setGalleryEvents(evts.filter(e => e.images && e.images.length > 0));
+        setGeneralGallery(generalRes.data.data || []);
       } catch (err) {
         console.error('Failed to fetch gallery:', err);
       } finally {
@@ -1646,21 +1693,34 @@ const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalle
   /* ── Upload ── */
   const handleUpload = async (e) => {
     e.preventDefault();
-    if (!uploadEventId) { setUploadError('Please select an event.'); return; }
-    if (uploadFiles.length === 0) { setUploadError('Please select at least one image.'); return; }
+    if (uploadFiles.length === 0) { setUploadError('Please select at least one media file.'); return; }
     setUploading(true);
     setUploadError('');
     try {
       const formData = new FormData();
       uploadFiles.forEach(f => formData.append('images', f));
-      const res = await axiosInstance.post(`/events/${uploadEventId}/gallery`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+
+      if (uploadEventId === 'unlinked') {
+        await axiosInstance.post('/gallery/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      } else {
+        if (!uploadEventId) { setUploadError('Please select an event.'); return; }
+        await axiosInstance.post(`/events/${uploadEventId}/gallery`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
+      }
+
       // Refresh gallery
-      const refreshRes = await axiosInstance.get('/events');
-      const evts = refreshRes.data.data || [];
+      const [eventsRes, generalRes] = await Promise.all([
+        axiosInstance.get('/events'),
+        axiosInstance.get('/gallery')
+      ]);
+      const evts = eventsRes.data.data || [];
       setAllEvents(evts);
       setGalleryEvents(evts.filter(ev => ev.images && ev.images.length > 0));
+      setGeneralGallery(generalRes.data.data || []);
+
       setShowUploadModal(false);
       setUploadFiles([]);
       setUploadEventId('');
@@ -1672,21 +1732,26 @@ const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalle
   };
 
   /* ── Delete image ── */
-  const handleDeleteImage = (eventId, publicId) => {
+  const handleDeleteImage = (eventId, publicId, generalId = null) => {
     openConfirm({
-      title: 'Delete Photo',
-      message: 'This photo will be permanently deleted. This action cannot be undone.',
+      title: 'Delete Media',
+      message: 'This media will be permanently deleted. This action cannot be undone.',
       confirmLabel: 'Delete',
       variant: 'danger',
       onConfirm: async () => {
         setConfirmDialog(d => ({ ...d, loading: true }));
         setDeletingId(publicId);
         try {
-          await axiosInstance.delete(`/events/${eventId}/gallery/${encodeURIComponent(publicId)}`);
-          setGalleryEvents(prev => prev.map(ev => {
-            if (ev._id !== eventId) return ev;
-            return { ...ev, images: ev.images.filter(img => img.public_id !== publicId) };
-          }).filter(ev => ev.images.length > 0));
+          if (generalId) {
+            await axiosInstance.delete(`/gallery/${generalId}`);
+            setGeneralGallery(prev => prev.filter(img => img._id !== generalId));
+          } else {
+            await axiosInstance.delete(`/events/${eventId}/gallery/${encodeURIComponent(publicId)}`);
+            setGalleryEvents(prev => prev.map(ev => {
+              if (ev._id !== eventId) return ev;
+              return { ...ev, images: ev.images.filter(img => img.public_id !== publicId) };
+            }).filter(ev => ev.images.length > 0));
+          }
           closeConfirm();
         } catch (err) {
           console.error('Delete image failed:', err);
@@ -1714,77 +1779,49 @@ const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalle
         <div>
           <h2 className="text-xl md:text-2xl font-bold text-slate-900">Event Gallery</h2>
           <p className="text-sm text-slate-500 mt-0.5">
-            {galleryEvents.reduce((sum, e) => sum + e.images.length, 0)} photos across {galleryEvents.length} events
           </p>
         </div>
-        {canManage && (
-          <button
-            onClick={() => { setUploadError(''); setShowUploadModal(true); }}
-            className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow hover:shadow-lg hover:shadow-blue-500/25 transition-all text-sm"
-          >
-            <Image size={15} />
-            <span className="hidden sm:inline">Upload Photos</span>
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {canManage && (
+            <button
+              onClick={() => { setUploadError(''); setShowUploadModal(true); }}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow hover:shadow-lg hover:shadow-blue-500/25 transition-all text-sm"
+            >
+              <Camera size={15} />
+              <span className="hidden sm:inline">Upload Media</span>
+            </button>
+          )}
+        </div>
       </div>
 
-      {galleryEvents.length === 0 ? (
+      {/* ── General Gallery ── */}
+      <GalleryMediaGrid
+        title="General Gallery"
+        subtitle="Media not linked to events"
+        items={generalGallery}
+        onItemClick={openLightbox}
+        onDelete={(pId, gId) => handleDeleteImage(null, pId, gId)}
+        canManage={canManage}
+        icon={Search}
+        gradientClasses="from-amber-50 to-orange-50/30"
+        headerAccentClasses="bg-amber-500 shadow-amber-200"
+        badgeClasses="text-amber-600 border-amber-200"
+      />
+
+      {galleryEvents.length === 0 && generalGallery.length === 0 ? (
         <EmptyState message="No gallery images yet. Upload images to events to see them here." />
       ) : (
         galleryEvents.map(event => (
-          <section key={event._id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-4 md:p-5 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-lg text-slate-900">{event.title}</h3>
-                <div className="flex items-center gap-3 mt-0.5 text-sm text-slate-500">
-                  <span className="flex items-center gap-1"><Calendar size={13} /> {new Date(event.date).toLocaleDateString()}</span>
-                  <span className="flex items-center gap-1"><MapPin size={13} /> {event.venue}</span>
-                </div>
-              </div>
-              <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-semibold rounded-full">
-                {event.images.length} photos
-              </span>
-            </div>
-
-            <div className="p-3 md:p-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
-                {event.images.map((img, idx) => (
-                  <div
-                    key={img.public_id || idx}
-                    className="group aspect-square rounded-xl overflow-hidden cursor-pointer relative"
-                  >
-                    <img
-                      src={img.url}
-                      alt={`${event.title} photo ${idx + 1}`}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      loading="lazy"
-                      onClick={() => openLightbox(event.images, idx)}
-                    />
-                    <div
-                      className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-center justify-center"
-                      onClick={() => openLightbox(event.images, idx)}
-                    >
-                      <Maximize2 size={22} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </div>
-                    {/* Delete button for faculty/admin */}
-                    {canManage && (
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleDeleteImage(event._id, img.public_id); }}
-                        disabled={deletingId === img.public_id}
-                        className="absolute top-1.5 right-1.5 bg-red-500 hover:bg-red-600 text-white p-1 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity shadow-md disabled:opacity-50"
-                        title="Delete photo"
-                      >
-                        {deletingId === img.public_id
-                          ? <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                          : <X size={12} />
-                        }
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </section>
+          <GalleryMediaGrid
+            key={event._id}
+            title={event.title}
+            subtitle={`${new Date(event.date).toLocaleDateString()} · ${event.venue}`}
+            items={event.images}
+            onItemClick={openLightbox}
+            onDelete={(pId) => handleDeleteImage(event._id, pId)}
+            canManage={canManage}
+            icon={Calendar}
+          />
         ))
       )}
 
@@ -1799,7 +1836,7 @@ const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalle
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600">
-              <h2 className="text-white font-bold text-lg">Upload Photos</h2>
+              <h2 className="text-white font-bold text-lg">Upload Media</h2>
               <button onClick={() => setShowUploadModal(false)} className="text-white/70 hover:text-white p-1.5 rounded-xl hover:bg-white/10 transition-colors">
                 <X size={18} />
               </button>
@@ -1814,21 +1851,24 @@ const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalle
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Select Event *</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Select Event / Destination *</label>
                 <select
                   value={uploadEventId}
                   onChange={e => setUploadEventId(e.target.value)}
                   className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
                 >
-                  <option value="">Choose an event…</option>
-                  {allEvents.map(ev => (
-                    <option key={ev._id} value={ev._id}>{ev.title}</option>
-                  ))}
+                  <option value="">Choose an option…</option>
+                  <option value="unlinked" className="font-bold text-blue-600">General Gallery (Unlinked)</option>
+                  <optgroup label="Link to Event">
+                    {allEvents.map(ev => (
+                      <option key={ev._id} value={ev._id}>{ev.title}</option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Photos *</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Media Files *</label>
                 <div
                   onClick={() => fileInputRef.current?.click()}
                   className="border-2 border-dashed border-slate-200 hover:border-blue-400 rounded-xl p-6 text-center cursor-pointer transition-colors"
@@ -1837,14 +1877,14 @@ const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalle
                   {uploadFiles.length > 0 ? (
                     <p className="text-sm text-blue-600 font-semibold">{uploadFiles.length} file{uploadFiles.length > 1 ? 's' : ''} selected</p>
                   ) : (
-                    <p className="text-sm text-slate-500">Click to select images (max 10)</p>
+                    <p className="text-sm text-slate-500">Click to select images/videos (max 10)</p>
                   )}
                 </div>
                 <input
                   ref={fileInputRef}
                   type="file"
                   multiple
-                  accept="image/*"
+                  accept="image/*,video/*"
                   className="hidden"
                   onChange={e => setUploadFiles(Array.from(e.target.files).slice(0, 10))}
                 />
@@ -1866,7 +1906,7 @@ const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalle
                 >
                   {uploading
                     ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Uploading…</>
-                    : <><Image size={15} /> Upload Photos</>
+                    : <><Camera size={15} /> Upload Media</>
                   }
                 </button>
               </div>
@@ -1990,15 +2030,6 @@ const RecruitmentView = ({ axiosInstance, user, openConfirm, closeConfirm, setCo
     });
   };
 
-  const statusBadge = (s) => s === 'open'
-    ? <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-bold rounded-full">Open</span>
-    : <span className="px-2.5 py-0.5 bg-slate-100 text-slate-500 text-xs font-bold rounded-full">Closed</span>;
-
-  const applicantBadge = (s) => {
-    const map = { selected: 'bg-green-100 text-green-700', rejected: 'bg-red-100 text-red-700', applied: 'bg-amber-100 text-amber-700' };
-    return <span className={`px-2 py-0.5 text-xs font-semibold rounded-full capitalize ${map[s] || map.applied}`}>{s}</span>;
-  };
-
   return (
     <div className="space-y-6 animate-fadeIn">
       {/* Header */}
@@ -2105,90 +2136,21 @@ const RecruitmentView = ({ axiosInstance, user, openConfirm, closeConfirm, setCo
             </button>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-6">
             {recruitments.map(rec => (
-              <div key={rec._id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                {/* Card Header */}
-                <div className="p-4 md:p-5 flex flex-col sm:flex-row items-start gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <h3 className="font-bold text-slate-900 text-base">{rec.title}</h3>
-                      {statusBadge(rec.status)}
-                      <span className="px-2 py-0.5 bg-blue-50 text-blue-600 text-xs font-semibold rounded-full capitalize">{rec.roleType}</span>
-                    </div>
-                    <p className="text-sm text-slate-500 mb-2 line-clamp-2">{rec.description}</p>
-                    <div className="flex flex-wrap gap-3 text-xs text-slate-500">
-                      <span className="flex items-center gap-1"><Calendar size={12} />{rec.event?.title || 'No event'}</span>
-                      <span className="flex items-center gap-1"><Users size={12} />{rec.branch}</span>
-                      <span className="flex items-center gap-1"><FileText size={12} />{rec.applicants?.length || 0} applicant(s)</span>
-                    </div>
-                  </div>
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
-                    <button
-                      onClick={() => toggleApplicants(rec._id)}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
-                    >
-                      <Users size={13} /> Applicants
-                      <ChevronDown size={13} className={`transition-transform ${expandedId === rec._id ? 'rotate-180' : ''}`} />
-                    </button>
-                    {rec.status === 'open' && (
-                      <button onClick={() => closeRecruit(rec._id)} className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-lg text-xs font-semibold transition-colors">
-                        Close
-                      </button>
-                    )}
-                    <button onClick={() => handleDelete(rec._id)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors">
-                      <Trash2 size={13} /> Delete
-                    </button>
-                  </div>
-                </div>
-
-                {/* Applicants Panel */}
-                {expandedId === rec._id && (
-                  <div className="border-t border-slate-100 bg-slate-50 p-4">
-                    {loadingApplicants[rec._id] ? (
-                      <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-slate-200 border-t-blue-500 rounded-full animate-spin" /></div>
-                    ) : (applicants[rec._id] || []).length === 0 ? (
-                      <div className="flex flex-col items-center py-6 text-slate-400">
-                        <Users size={28} className="mb-2 text-slate-300" />
-                        <p className="text-sm font-medium">No applicants yet</p>
-                        <p className="text-xs">Applications will appear here once students apply.</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <p className="text-xs font-semibold text-slate-500 uppercase mb-3">{(applicants[rec._id] || []).length} Applicant(s)</p>
-                        {(applicants[rec._id] || []).map(app => (
-                          <div key={app._id} className="bg-white rounded-xl p-3 border border-slate-100 flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                            <div className="w-9 h-9 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">
-                              {app.student?.name?.charAt(0) || '?'}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-slate-900 text-sm">{app.student?.name || 'Unknown'}</p>
-                              <p className="text-xs text-slate-500">{app.student?.email} · {app.student?.branch}</p>
-                              {app.note && <p className="text-xs text-slate-400 mt-1 italic">"{app.note}"</p>}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              {applicantBadge(app.status)}
-                              {app.status === 'applied' && (
-                                <div className="flex gap-1">
-                                  <button
-                                    onClick={() => updateApplicantStatus(rec._id, app._id, 'selected')}
-                                    className="px-2.5 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded-lg text-xs font-semibold transition-colors"
-                                  >Select</button>
-                                  <button
-                                    onClick={() => updateApplicantStatus(rec._id, app._id, 'rejected')}
-                                    className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-xs font-semibold transition-colors"
-                                  >Reject</button>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <RecruitmentCard
+                key={rec._id}
+                rec={rec}
+                onEdit={() => { }} // Placeholder or implement if needed
+                onDelete={handleDelete}
+                onToggleApplicants={toggleApplicants}
+                isExpanded={expandedId === rec._id}
+                applicants={applicants[rec._id]}
+                loadingApplicants={loadingApplicants[rec._id]}
+                onUpdateApplicantStatus={updateApplicantStatus}
+                onCloseRecruitment={closeRecruit}
+                userRole={user.role}
+              />
             ))}
           </div>
         )
@@ -2198,6 +2160,113 @@ const RecruitmentView = ({ axiosInstance, user, openConfirm, closeConfirm, setCo
 };
 
 // ─── Faculty Requests View (Admin) ────────────────────────────────────────────
+// ─── Event Approvals View (Admin) ───────────────────────────────────────────
+const EventApprovalsView = ({ pendingEventRequests, fetchEventRequests, showToast, openConfirm, closeConfirm, setConfirmDialog }) => {
+  const handleApprove = async (id) => {
+    try {
+      await axiosInstance.patch(`/event-requests/${id}/approve`);
+      showToast('Event approved successfully!');
+      fetchEventRequests();
+    } catch (err) {
+      showToast('Failed to approve event.', 'error');
+    }
+  };
+
+  const handleReject = (id) => {
+    openConfirm({
+      title: 'Reject Event Request',
+      message: 'Are you sure you want to reject this event request? This action cannot be undone.',
+      confirmLabel: 'Reject',
+      variant: 'danger',
+      onConfirm: async () => {
+        setConfirmDialog(d => ({ ...d, loading: true }));
+        try {
+          await axiosInstance.patch(`/event-requests/${id}/reject`);
+          showToast('Event request rejected.');
+          fetchEventRequests();
+          closeConfirm();
+        } catch (err) {
+          showToast('Failed to reject event.', 'error');
+          closeConfirm();
+        }
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl md:text-2xl font-bold text-slate-900">Event Approvals</h2>
+          <p className="text-sm text-slate-500 mt-0.5">Review and approve student event proposals</p>
+        </div>
+        {pendingEventRequests.length > 0 && (
+          <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-bold rounded-full">
+            {pendingEventRequests.length} Pending
+          </span>
+        )}
+      </div>
+
+      {/* Empty State */}
+      {pendingEventRequests.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
+          <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center mb-5">
+            <FileCheck size={38} className="text-emerald-400" />
+          </div>
+          <h3 className="font-bold text-slate-700 text-xl mb-2">All Clear!</h3>
+          <p className="text-slate-400 text-sm text-center max-w-xs leading-relaxed">
+            There are no pending event requests at the moment. New requests will appear here when students submit proposals.
+          </p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {pendingEventRequests.map((req) => (
+            <div key={req._id} className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-200 hover:shadow-md transition-all">
+              <div className="flex flex-col md:flex-row justify-between gap-4 md:gap-6">
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-slate-900 text-lg mb-2 truncate">{req.title}</h3>
+                  <p className="text-slate-600 text-sm mb-4 line-clamp-2">{req.description}</p>
+
+                  <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
+                      <User size={14} className="text-blue-500" />
+                      <span className="font-semibold text-slate-700">{req.requestedBy?.name || 'Unknown'}</span> ({req.branch})
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
+                      <Calendar size={14} className="text-amber-500" />
+                      <span>{new Date(req.date).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
+                      <MapPin size={14} className="text-emerald-500" />
+                      <span className="truncate max-w-[150px]">{req.venue}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 self-end md:self-center">
+                  <button
+                    onClick={() => handleApprove(req._id)}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-xl font-bold text-sm hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20"
+                  >
+                    <Check size={16} /> Approve
+                  </button>
+                  <button
+                    onClick={() => handleReject(req._id)}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold text-sm hover:bg-red-100 transition-colors"
+                  >
+                    <X size={16} /> Reject
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const FacultyRequestsView = ({ pendingFaculty, allUsers, fetchUsers, handleApprove, handleReject }) => {
   return (
     <div className="space-y-6 animate-fadeIn">

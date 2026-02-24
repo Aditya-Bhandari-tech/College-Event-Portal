@@ -3,7 +3,7 @@ import {
     Calendar, Users, Bell, Search, Image,
     UserPlus, Edit, Trash, Plus, FileText, CheckCircle, XCircle,
     UserCheck, ChevronRight, ChevronLeft, Menu, LogOut, Settings, Award, Check, X, Download,
-    Upload, Trash2, Maximize2, User
+    Upload, Trash2, Maximize2, User, Play, ImageIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axios';
@@ -15,8 +15,10 @@ import FacultyProfileCard from '../components/profile/FacultyProfileCard';
 import { useTheme } from '../contexts/ThemeContext';
 import DarkModeToggle from '../components/common/DarkModeToggle';
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import AttendeesModal from '../components/specific/AttendeesModal';
+import RecruitmentCard from '../components/specific/RecruitmentCard';
+import GalleryMediaGrid from '../components/specific/GalleryMediaGrid';
 
 const FacultyDashboard = () => {
     const navigate = useNavigate();
@@ -45,7 +47,13 @@ const FacultyDashboard = () => {
     const [recruitments, setRecruitments] = useState([]);
     const [students, setStudents] = useState([]);
     const [announcements, setAnnouncements] = useState([]);
-    const [galleryItems, setGalleryItems] = useState([]);
+    const [galleryItems, setGalleryItems] = useState([]); // Old state, will be replaced by galleryData
+    const [generalGalleryItems, setGeneralGalleryItems] = useState([]);
+    const [galleryData, setGalleryData] = useState([]); // New state for event-specific gallery
+
+    // Recruitment specific
+    const [expandedRecruitment, setExpandedRecruitment] = useState(null);
+    const [recruitmentApplicants, setRecruitmentApplicants] = useState([]);
 
     // Modals
     const [showEventModal, setShowEventModal] = useState(false);
@@ -225,8 +233,8 @@ const FacultyDashboard = () => {
         setLoading(prev => ({ ...prev, applicants: true }));
         try {
             const res = await axiosInstance.get(`/recruitments/${recruitmentId}/applicants`);
-            setSelectedItem(prev => ({ ...(prev || {}), applicants: res.data.data.applicants, recruitmentId }));
-            setShowApplicantsModal(true);
+            setRecruitmentApplicants(res.data.data.applicants);
+            setExpandedRecruitment(recruitmentId);
         } catch (error) {
             console.error("Error fetching applicants", error);
             alert(error.response?.data?.message || "Failed to fetch applicants");
@@ -239,12 +247,11 @@ const FacultyDashboard = () => {
         try {
             await axiosInstance.patch(`/recruitments/${recruitmentId}/applicants/${applicantId}`, { status });
             // Update local state
-            setSelectedItem(prev => ({
-                ...prev,
-                applicants: prev.applicants.map(app =>
+            setRecruitmentApplicants(prev =>
+                prev.map(app =>
                     app._id === applicantId ? { ...app, status } : app
                 )
-            }));
+            );
         } catch (error) {
             console.error("Update applicant status failed", error);
             alert(error.response?.data?.message || "Failed to update applicant status");
@@ -255,12 +262,16 @@ const FacultyDashboard = () => {
     const fetchGallery = async () => {
         setLoading(prev => ({ ...prev, gallery: true }));
         try {
-            const res = await axiosInstance.get('/events');
-            const allEvents = res.data.data || [];
+            const [eventsRes, generalRes] = await Promise.all([
+                axiosInstance.get('/events'),
+                axiosInstance.get('/gallery')
+            ]);
+            const allEvents = eventsRes.data.data || [];
             // Faculty sees only their own events' images
             const myEventsWithImages = allEvents
                 .filter(e => (e.createdBy === user._id || e.createdBy?._id === user._id) && e.images && e.images.length > 0);
-            setGalleryItems(myEventsWithImages);
+            setGalleryData(myEventsWithImages);
+            setGeneralGalleryItems(generalRes.data.data || []);
         } catch (error) {
             console.error('Error fetching gallery', error);
         } finally {
@@ -271,47 +282,60 @@ const FacultyDashboard = () => {
     const handleGalleryUpload = async (e) => {
         e.preventDefault();
         if (!galleryUploadEventId || galleryUploadFiles.length === 0) {
-            alert('Please select an event and at least one image.');
+            alert('Please select an event and at least one media file.');
             return;
         }
         if (galleryUploadFiles.length > 10) {
-            alert('You can upload a maximum of 10 images at a time.');
+            alert('You can upload a maximum of 10 media files at a time.');
             return;
         }
         setGalleryUploading(true);
         try {
             const formData = new FormData();
             galleryUploadFiles.forEach(file => formData.append('images', file));
-            await axiosInstance.post(`/events/${galleryUploadEventId}/gallery`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
-            alert('Images uploaded successfully!');
+
+            if (galleryUploadEventId === 'unlinked') {
+                await axiosInstance.post('/gallery/upload', formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
+            } else {
+                await axiosInstance.post(`/events/${galleryUploadEventId}/gallery`, formData, {
+                    headers: { 'Content-Type': 'multipart/form-data' },
+                });
+            }
+
+            alert('Media uploaded successfully!');
             setShowGalleryUploadModal(false);
             setGalleryUploadEventId('');
             setGalleryUploadFiles([]);
             fetchGallery();
         } catch (error) {
             console.error('Gallery upload failed', error);
-            alert(error.response?.data?.message || 'Failed to upload images');
+            alert(error.response?.data?.message || 'Failed to upload media');
         } finally {
             setGalleryUploading(false);
         }
     };
 
-    const handleDeleteGalleryImage = async (eventId, publicId) => {
-        if (!window.confirm('Delete this image permanently?')) return;
+    const handleDeleteGalleryImage = async (eventId, publicId, generalId = null) => {
+        if (!window.confirm('Delete this media permanently?')) return;
         try {
-            await axiosInstance.delete(`/events/${eventId}/gallery/${publicId}`);
-            // Update local state
-            setGalleryItems(prev => prev.map(event => {
-                if (event._id === eventId) {
-                    return { ...event, images: event.images.filter(img => img.public_id !== publicId) };
-                }
-                return event;
-            }).filter(event => event.images.length > 0));
+            if (generalId) {
+                await axiosInstance.delete(`/gallery/${generalId}`);
+                setGeneralGalleryItems(prev => prev.filter(img => img._id !== generalId));
+            } else {
+                await axiosInstance.delete(`/events/${eventId}/gallery/${publicId}`);
+                // Update local state
+                setGalleryData(prev => prev.map(event => {
+                    if (event._id === eventId) {
+                        return { ...event, images: event.images.filter(img => img.public_id !== publicId) };
+                    }
+                    return event;
+                }).filter(event => event.images.length > 0));
+            }
         } catch (error) {
-            console.error('Delete gallery image failed', error);
-            alert('Failed to delete image');
+            console.error('Delete gallery media failed', error);
+            alert('Failed to delete media');
         }
     };
 
@@ -470,7 +494,7 @@ const FacultyDashboard = () => {
             student.email
         ]);
 
-        doc.autoTable({
+        autoTable(doc, {
             head: [tableColumn],
             body: tableRows,
             startY: 60,
@@ -840,30 +864,19 @@ const FacultyDashboard = () => {
                             ) : loading.recruitments ? <Loader /> : (
                                 <div className="space-y-3">
                                     {recruitments.map(rec => (
-                                        <div key={rec._id} className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm hover:shadow-md transition-shadow">
-                                            <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                                                        <h3 className="font-bold text-slate-800 text-base">{rec.title}</h3>
-                                                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${rec.status === 'open' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                            {rec.status === 'open' ? 'Open' : 'Closed'}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-sm text-violet-600 font-medium mb-2">{rec.roleType}{rec.event?.title ? ` · ${rec.event.title}` : ''}</p>
-                                                    <p className="text-slate-500 text-sm mb-3">{rec.description}</p>
-                                                    <button onClick={() => fetchApplicants(rec._id)}
-                                                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100 rounded-lg transition-colors">
-                                                        <Users size={13} /> {rec.applicants?.length || 0} Applicant{(rec.applicants?.length || 0) !== 1 ? 's' : ''}
-                                                    </button>
-                                                </div>
-                                                <div className="flex sm:flex-col gap-2 sm:gap-1.5 justify-end">
-                                                    <button onClick={() => { setSelectedItem(rec); setRecruitmentForm(rec); setShowRecruitmentModal(true); }}
-                                                        className="p-2 text-slate-500 hover:text-violet-600 hover:bg-violet-50 rounded-xl transition-colors" aria-label={`Edit ${rec.title}`}><Edit size={17} /></button>
-                                                    <button onClick={() => handleDeleteRecruitment(rec._id)}
-                                                        className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors" aria-label={`Delete ${rec.title}`}><Trash size={17} /></button>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        <RecruitmentCard
+                                            key={rec._id}
+                                            rec={rec}
+                                            onEdit={(r) => { setSelectedItem(r); setRecruitmentForm(r); setShowRecruitmentModal(true); }}
+                                            onDelete={handleDeleteRecruitment}
+                                            onToggleApplicants={fetchApplicants}
+                                            isExpanded={expandedRecruitment === rec._id}
+                                            applicants={recruitmentApplicants}
+                                            loadingApplicants={loading.applicants}
+                                            userRole="faculty"
+                                            onUpdateApplicantStatus={handleUpdateApplicantStatus}
+                                            onCloseApplicants={() => { setExpandedRecruitment(null); setRecruitmentApplicants([]); }}
+                                        />
                                     ))}
                                     {recruitments.length === 0 && <EmptyState message="No recruitment posts yet. Create one to start recruiting!" />}
                                 </div>
@@ -1013,66 +1026,52 @@ const FacultyDashboard = () => {
                                 }
                             />
                             {loading.gallery ? <Loader /> : (
-                                galleryItems.length === 0 ? (
-                                    <EmptyState message="No gallery images yet. Upload photos to your events to see them here." />
-                                ) : (
-                                    <div className="space-y-6">
-                                        {galleryItems.map(event => (
-                                            <section key={event._id} className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                                <div className="p-4 md:p-5 border-b border-slate-100">
-                                                    <div className="flex items-center justify-between">
-                                                        <div>
-                                                            <h3 className="font-bold text-lg text-slate-900">{event.title}</h3>
-                                                            <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
-                                                                <span className="flex items-center gap-1"><Calendar size={14} /> {new Date(event.date).toLocaleDateString()}</span>
-                                                            </div>
-                                                        </div>
-                                                        <span className="px-3 py-1 bg-blue-50 text-blue-600 text-xs font-semibold rounded-full">
-                                                            {event.images.length} photos
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                                <div className="p-3 md:p-4">
-                                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 md:gap-3">
-                                                        {event.images.map((img, idx) => (
-                                                            <div key={img.public_id || idx} className="group aspect-square rounded-xl overflow-hidden relative">
-                                                                <img
-                                                                    src={img.url}
-                                                                    alt={`${event.title} photo ${idx + 1}`}
-                                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300 cursor-pointer"
-                                                                    loading="lazy"
-                                                                    onClick={() => setLightbox({ open: true, images: event.images, index: idx })}
-                                                                />
-                                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 pointer-events-none"></div>
-                                                                <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); setLightbox({ open: true, images: event.images, index: idx }); }}
-                                                                        className="p-1.5 bg-white/90 rounded-lg text-slate-700 hover:bg-white transition-colors shadow-sm"
-                                                                        aria-label="View full size"
-                                                                    >
-                                                                        <Maximize2 size={14} />
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={(e) => { e.stopPropagation(); handleDeleteGalleryImage(event._id, img.public_id); }}
-                                                                        className="p-1.5 bg-red-500/90 rounded-lg text-white hover:bg-red-600 transition-colors shadow-sm"
-                                                                        aria-label="Delete image"
-                                                                    >
-                                                                        <Trash2 size={14} />
-                                                                    </button>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            </section>
-                                        ))}
-                                    </div>
-                                )
+                                <div className="space-y-6">
+                                    {/* General Gallery Section */}
+                                    {generalGalleryItems.length > 0 && (
+                                        <GalleryMediaGrid
+                                            title="General Gallery"
+                                            subtitle="Capture spontaneous moments & memories"
+                                            items={generalGalleryItems}
+                                            onItemClick={(items, idx) => setLightbox({ open: true, images: items, index: idx })}
+                                            onDelete={(pId, gId) => handleDeleteGalleryImage(null, pId, gId)}
+                                            canManage={true}
+                                            icon={Search}
+                                            gradientClasses="from-amber-50 to-orange-50/30"
+                                            headerAccentClasses="bg-amber-500 shadow-amber-200"
+                                            badgeClasses="text-amber-600 border-amber-200"
+                                        />
+                                    )}
+
+                                    {/* Event Gallery Sections */}
+                                    {galleryData.length === 0 && generalGalleryItems.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-dashed border-slate-300 shadow-sm">
+                                            <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4 text-slate-300">
+                                                <ImageIcon size={32} />
+                                            </div>
+                                            <h3 className="font-bold text-slate-600">No media yet</h3>
+                                            <p className="text-slate-400 text-sm">Upload images or videos to display them here.</p>
+                                        </div>
+                                    ) : (
+                                        galleryData.filter(event => event.images && event.images.length > 0).map(event => (
+                                            <GalleryMediaGrid
+                                                key={event._id}
+                                                title={event.title}
+                                                subtitle={`${new Date(event.date).toLocaleDateString()} · ${event.venue}`}
+                                                items={event.images}
+                                                onItemClick={(items, idx) => setLightbox({ open: true, images: items, index: idx })}
+                                                onDelete={(pId) => handleDeleteGalleryImage(event._id, pId)}
+                                                canManage={true}
+                                                icon={Calendar}
+                                            />
+                                        ))
+                                    )}
+                                </div>
                             )}
                         </div>
                     )}
 
-                    {/* Profile */}
+                    {/* --- Profile --- */}
                     {activeRoute === 'Profile' && (
                         <div className="animate-fadeIn">
                             <h2 className={`text-xl md:text-2xl font-bold mb-4 md:mb-6 ${darkMode ? 'text-white' : 'text-slate-800'}`}>My Profile</h2>
@@ -1088,8 +1087,8 @@ const FacultyDashboard = () => {
                         </div>
                     )}
 
-                </div>
-            </main>
+                </div >
+            </main >
 
             {/* --- MODALS --- */}
 
@@ -1107,284 +1106,315 @@ const FacultyDashboard = () => {
             />
 
             {/* Event Modal */}
-            {showEventModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="event-modal-title">
-                    <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
-                        <h3 id="event-modal-title" className="text-lg md:text-xl font-bold mb-4">{selectedItem ? 'Edit Event' : 'Create New Event'}</h3>
-                        <form onSubmit={selectedItem ? handleUpdateEvent : handleCreateEvent} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Event Title</label>
-                                <input type="text" required value={eventForm.title} onChange={e => setEventForm({ ...eventForm, title: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                                <textarea required value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows="3"></textarea>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {
+                showEventModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="event-modal-title">
+                        <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                            <h3 id="event-modal-title" className="text-lg md:text-xl font-bold mb-4">{selectedItem ? 'Edit Event' : 'Create New Event'}</h3>
+                            <form onSubmit={selectedItem ? handleUpdateEvent : handleCreateEvent} className="space-y-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
-                                    <input type="datetime-local" required value={eventForm.date} onChange={e => setEventForm({ ...eventForm, date: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Event Title</label>
+                                    <input type="text" required value={eventForm.title} onChange={e => setEventForm({ ...eventForm, title: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Venue</label>
-                                    <input type="text" required value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                                    <textarea required value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows="3"></textarea>
                                 </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Branch</label>
-                                <input type="text" disabled value={eventForm.branch} className="w-full border border-slate-300 bg-slate-100 rounded-lg px-3 py-2 text-slate-500 cursor-not-allowed" />
-                            </div>
-                            <div className="flex gap-3 mt-6">
-                                <button type="button" onClick={() => setShowEventModal(false)} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
-                                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Event</button>
-                            </div>
-                        </form>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                                        <input type="datetime-local" required value={eventForm.date} onChange={e => setEventForm({ ...eventForm, date: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-slate-700 mb-1">Venue</label>
+                                        <input type="text" required value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Branch</label>
+                                    <input type="text" disabled value={eventForm.branch} className="w-full border border-slate-300 bg-slate-100 rounded-lg px-3 py-2 text-slate-500 cursor-not-allowed" />
+                                </div>
+                                <div className="flex gap-3 mt-6">
+                                    <button type="button" onClick={() => setShowEventModal(false)} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
+                                    <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Event</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Recruitment Modal */}
-            {showRecruitmentModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="recruitment-modal-title">
-                    <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
-                        <h3 id="recruitment-modal-title" className="text-lg md:text-xl font-bold mb-4">{selectedItem ? 'Edit Recruitment' : 'New Recruitment'}</h3>
-                        <form onSubmit={selectedItem ? handleUpdateRecruitment : handleCreateRecruitment} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
-                                <input type="text" required value={recruitmentForm.title} onChange={e => setRecruitmentForm({ ...recruitmentForm, title: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Role Type</label>
-                                <select required value={recruitmentForm.roleType} onChange={e => setRecruitmentForm({ ...recruitmentForm, roleType: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                                    <option value="">Select Role</option>
-                                    <option value="volunteer">Volunteer</option>
-                                    <option value="anchor">Anchor</option>
-                                    <option value="coordinator">Coordinator</option>
-                                    <option value="technical">Technical</option>
-                                    <option value="other">Other</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Linked Event</label>
-                                <select required value={recruitmentForm.eventId} onChange={e => setRecruitmentForm({ ...recruitmentForm, eventId: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                                    <option value="">Select Event</option>
-                                    {events.map(e => <option key={e._id} value={e._id}>{e.title}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                                <textarea required value={recruitmentForm.description} onChange={e => setRecruitmentForm({ ...recruitmentForm, description: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows="3"></textarea>
-                            </div>
-                            <div className="flex gap-3 mt-6">
-                                <button type="button" onClick={() => setShowRecruitmentModal(false)} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
-                                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Post</button>
-                            </div>
-                        </form>
+            {
+                showRecruitmentModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="recruitment-modal-title">
+                        <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                            <h3 id="recruitment-modal-title" className="text-lg md:text-xl font-bold mb-4">{selectedItem ? 'Edit Recruitment' : 'New Recruitment'}</h3>
+                            <form onSubmit={selectedItem ? handleUpdateRecruitment : handleCreateRecruitment} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
+                                    <input type="text" required value={recruitmentForm.title} onChange={e => setRecruitmentForm({ ...recruitmentForm, title: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Role Type</label>
+                                    <select required value={recruitmentForm.roleType} onChange={e => setRecruitmentForm({ ...recruitmentForm, roleType: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <option value="">Select Role</option>
+                                        <option value="volunteer">Volunteer</option>
+                                        <option value="anchor">Anchor</option>
+                                        <option value="coordinator">Coordinator</option>
+                                        <option value="technical">Technical</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Linked Event</label>
+                                    <select required value={recruitmentForm.eventId} onChange={e => setRecruitmentForm({ ...recruitmentForm, eventId: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
+                                        <option value="">Select Event</option>
+                                        {events.map(e => <option key={e._id} value={e._id}>{e.title}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                                    <textarea required value={recruitmentForm.description} onChange={e => setRecruitmentForm({ ...recruitmentForm, description: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows="3"></textarea>
+                                </div>
+                                <div className="flex gap-3 mt-6">
+                                    <button type="button" onClick={() => setShowRecruitmentModal(false)} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
+                                    <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Post</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Announcement Modal */}
-            {showAnnouncementModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="announcement-modal-title">
-                    <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
-                        <h3 id="announcement-modal-title" className="text-lg md:text-xl font-bold mb-4">New Announcement</h3>
-                        <form onSubmit={handleCreateAnnouncement} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
-                                <input type="text" required value={announcementForm.title} onChange={e => setAnnouncementForm({ ...announcementForm, title: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
-                                <textarea required value={announcementForm.message} onChange={e => setAnnouncementForm({ ...announcementForm, message: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows="4"></textarea>
-                            </div>
-                            <div className="flex gap-3 mt-6">
-                                <button type="button" onClick={() => setShowAnnouncementModal(false)} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
-                                <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Post</button>
-                            </div>
-                        </form>
+            {
+                showAnnouncementModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="announcement-modal-title">
+                        <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                            <h3 id="announcement-modal-title" className="text-lg md:text-xl font-bold mb-4">New Announcement</h3>
+                            <form onSubmit={handleCreateAnnouncement} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
+                                    <input type="text" required value={announcementForm.title} onChange={e => setAnnouncementForm({ ...announcementForm, title: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
+                                    <textarea required value={announcementForm.message} onChange={e => setAnnouncementForm({ ...announcementForm, message: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows="4"></textarea>
+                                </div>
+                                <div className="flex gap-3 mt-6">
+                                    <button type="button" onClick={() => setShowAnnouncementModal(false)} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
+                                    <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Post</button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Applicants Modal */}
-            {showApplicantsModal && selectedItem && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="applicants-modal-title">
-                    <div className="bg-white rounded-2xl w-full max-w-3xl p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[85vh] overflow-y-auto">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 id="applicants-modal-title" className="text-lg md:text-xl font-bold">Applicants</h3>
-                            <button onClick={() => setShowApplicantsModal(false)} className="p-2 hover:bg-slate-100 rounded-full" aria-label="Close applicants modal"><X size={20} /></button>
-                        </div>
-
-                        <div className="space-y-4">
-                            {selectedItem.applicants?.map(app => (
-                                <div key={app._id} className="border border-slate-200 rounded-lg p-3 md:p-4 flex flex-col sm:flex-row justify-between items-start gap-3">
-                                    <div className="min-w-0 flex-1">
-                                        <p className="font-bold text-slate-900 text-sm md:text-base">{app.student?.name || 'Unknown Student'}</p>
-                                        <p className="text-xs md:text-sm text-slate-600 truncate">{app.student?.email}</p>
-                                        {app.student?.branch && <p className="text-xs text-slate-500 mt-0.5">{app.student.branch}</p>}
-                                        <div className="mt-2 bg-slate-50 p-2 rounded text-xs md:text-sm text-slate-700">{app.note || 'No cover note'}</div>
-                                    </div>
-                                    <div className="flex items-center gap-2 flex-shrink-0">
-                                        {app.status === 'applied' ? (
-                                            <>
-                                                <button
-                                                    onClick={() => handleUpdateApplicantStatus(selectedItem.recruitmentId, app._id, 'selected')}
-                                                    className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors flex items-center gap-1"
-                                                    aria-label={`Accept ${app.student?.name}`}
-                                                >
-                                                    <Check size={14} /> Accept
-                                                </button>
-                                                <button
-                                                    onClick={() => handleUpdateApplicantStatus(selectedItem.recruitmentId, app._id, 'rejected')}
-                                                    className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors flex items-center gap-1"
-                                                    aria-label={`Reject ${app.student?.name}`}
-                                                >
-                                                    <X size={14} /> Reject
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <span className={`px-3 py-1.5 text-xs font-bold rounded-full ${app.status === 'selected' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                {app.status === 'selected' ? '✓ Accepted' : '✗ Rejected'}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                            {(!selectedItem.applicants || selectedItem.applicants.length === 0) && (
-                                <p className="text-center text-slate-500 py-8">No applicants yet.</p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Gallery Upload Modal */}
-            {showGalleryUploadModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="gallery-upload-title">
-                    <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
-                        <h3 id="gallery-upload-title" className="text-lg md:text-xl font-bold mb-4">Upload Gallery Images</h3>
-                        <form onSubmit={handleGalleryUpload} className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Select Event</label>
-                                <select
-                                    required
-                                    value={galleryUploadEventId}
-                                    onChange={e => setGalleryUploadEventId(e.target.value)}
-                                    className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                                >
-                                    <option value="">Choose an event...</option>
-                                    {events.map(e => <option key={e._id} value={e._id}>{e.title}</option>)}
-                                </select>
+            {
+                showApplicantsModal && selectedItem && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="applicants-modal-title">
+                        <div className="bg-white rounded-2xl w-full max-w-3xl p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[85vh] overflow-y-auto">
+                            <div className="flex justify-between items-center mb-6">
+                                <h3 id="applicants-modal-title" className="text-lg md:text-xl font-bold">Applicants</h3>
+                                <button onClick={() => setShowApplicantsModal(false)} className="p-2 hover:bg-slate-100 rounded-full" aria-label="Close applicants modal"><X size={20} /></button>
                             </div>
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 mb-1">Images (max 10)</label>
-                                <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors cursor-pointer"
-                                    onClick={() => document.getElementById('gallery-file-input').click()}
-                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-blue-400', 'bg-blue-50'); }}
-                                    onDragLeave={(e) => { e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50'); }}
-                                    onDrop={(e) => {
-                                        e.preventDefault();
-                                        e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
-                                        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
-                                        setGalleryUploadFiles(prev => [...prev, ...files].slice(0, 10));
-                                    }}
-                                >
-                                    <Upload size={32} className="mx-auto text-slate-400 mb-2" />
-                                    <p className="text-sm text-slate-600">Click or drag images here</p>
-                                    <p className="text-xs text-slate-400 mt-1">JPG, PNG up to 10MB each</p>
-                                </div>
-                                <input
-                                    id="gallery-file-input"
-                                    type="file"
-                                    multiple
-                                    accept="image/jpeg,image/png,image/jpg"
-                                    className="hidden"
-                                    onChange={(e) => setGalleryUploadFiles(prev => [...prev, ...Array.from(e.target.files)].slice(0, 10))}
-                                />
-                                {galleryUploadFiles.length > 0 && (
-                                    <div className="mt-3 space-y-2">
-                                        <p className="text-xs text-slate-500 font-medium">{galleryUploadFiles.length} file(s) selected</p>
-                                        <div className="grid grid-cols-5 gap-2">
-                                            {galleryUploadFiles.map((file, i) => (
-                                                <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100">
-                                                    <img src={URL.createObjectURL(file)} alt={file.name} className="w-full h-full object-cover" />
+
+                            <div className="space-y-4">
+                                {selectedItem.applicants?.map(app => (
+                                    <div key={app._id} className="border border-slate-200 rounded-lg p-3 md:p-4 flex flex-col sm:flex-row justify-between items-start gap-3">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="font-bold text-slate-900 text-sm md:text-base">{app.student?.name || 'Unknown Student'}</p>
+                                            <p className="text-xs md:text-sm text-slate-600 truncate">{app.student?.email}</p>
+                                            {app.student?.branch && <p className="text-xs text-slate-500 mt-0.5">{app.student.branch}</p>}
+                                            <div className="mt-2 bg-slate-50 p-2 rounded text-xs md:text-sm text-slate-700">{app.note || 'No cover note'}</div>
+                                        </div>
+                                        <div className="flex items-center gap-2 flex-shrink-0">
+                                            {app.status === 'applied' ? (
+                                                <>
                                                     <button
-                                                        type="button"
-                                                        onClick={() => setGalleryUploadFiles(prev => prev.filter((_, idx) => idx !== i))}
-                                                        className="absolute top-0.5 right-0.5 p-0.5 bg-red-500 text-white rounded-full"
-                                                        aria-label={`Remove ${file.name}`}
+                                                        onClick={() => handleUpdateApplicantStatus(selectedItem.recruitmentId, app._id, 'selected')}
+                                                        className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors flex items-center gap-1"
+                                                        aria-label={`Accept ${app.student?.name}`}
                                                     >
-                                                        <X size={12} />
+                                                        <Check size={14} /> Accept
                                                     </button>
-                                                </div>
-                                            ))}
+                                                    <button
+                                                        onClick={() => handleUpdateApplicantStatus(selectedItem.recruitmentId, app._id, 'rejected')}
+                                                        className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors flex items-center gap-1"
+                                                        aria-label={`Reject ${app.student?.name}`}
+                                                    >
+                                                        <X size={14} /> Reject
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <span className={`px-3 py-1.5 text-xs font-bold rounded-full ${app.status === 'selected' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                    {app.status === 'selected' ? '✓ Accepted' : '✗ Rejected'}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
+                                ))}
+                                {(!selectedItem.applicants || selectedItem.applicants.length === 0) && (
+                                    <p className="text-center text-slate-500 py-8">No applicants yet.</p>
                                 )}
                             </div>
-                            <div className="flex gap-3 mt-6">
-                                <button type="button" onClick={() => { setShowGalleryUploadModal(false); setGalleryUploadFiles([]); }} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
-                                <button type="submit" disabled={galleryUploading} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                                    {galleryUploading ? (
-                                        <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Uploading...</>
-                                    ) : 'Upload Images'}
-                                </button>
-                            </div>
-                        </form>
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
+
+            {/* Gallery Upload Modal */}
+            {
+                showGalleryUploadModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="gallery-upload-title">
+                        <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
+                            <h3 id="gallery-upload-title" className="text-lg md:text-xl font-bold mb-4">Upload Gallery Media</h3>
+                            <form onSubmit={handleGalleryUpload} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Select Event</label>
+                                    <select
+                                        required
+                                        value={galleryUploadEventId}
+                                        onChange={e => setGalleryUploadEventId(e.target.value)}
+                                        className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
+                                    >
+                                        <option value="">Choose an option...</option>
+                                        <option value="unlinked" className="font-bold text-blue-600">General Gallery (Unlinked)</option>
+                                        <optgroup label="Link to Event">
+                                            {events.map(e => <option key={e._id} value={e._id}>{e.title}</option>)}
+                                        </optgroup>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 mb-1">Media Files (max 10)</label>
+                                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors cursor-pointer"
+                                        onClick={() => document.getElementById('gallery-file-input').click()}
+                                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-blue-400', 'bg-blue-50'); }}
+                                        onDragLeave={(e) => { e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50'); }}
+                                        onDrop={(e) => {
+                                            e.preventDefault();
+                                            e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
+                                            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
+                                            setGalleryUploadFiles(prev => [...prev, ...files].slice(0, 10));
+                                        }}
+                                    >
+                                        <Upload size={32} className="mx-auto text-slate-400 mb-2" />
+                                        <p className="text-sm text-slate-600">Click or drag media here</p>
+                                        <p className="text-xs text-slate-400 mt-1">Images/Videos up to 10MB each</p>
+                                    </div>
+                                    <input
+                                        id="gallery-file-input"
+                                        type="file"
+                                        multiple
+                                        accept="image/*,video/*"
+                                        className="hidden"
+                                        onChange={(e) => setGalleryUploadFiles(prev => [...prev, ...Array.from(e.target.files)].slice(0, 10))}
+                                    />
+                                    {galleryUploadFiles.length > 0 && (
+                                        <div className="mt-3 space-y-2">
+                                            <p className="text-xs text-slate-500 font-medium">{galleryUploadFiles.length} file(s) selected</p>
+                                            <div className="grid grid-cols-5 gap-2">
+                                                {galleryUploadFiles.map((file, i) => (
+                                                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100">
+                                                        {file.type.startsWith('video/') ? (
+                                                            <video src={URL.createObjectURL(file)} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <img src={URL.createObjectURL(file)} alt={file.name} className="w-full h-full object-cover" />
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setGalleryUploadFiles(prev => prev.filter((_, idx) => idx !== i))}
+                                                            className="absolute top-0.5 right-0.5 p-0.5 bg-red-500 text-white rounded-full"
+                                                            aria-label={`Remove ${file.name}`}
+                                                        >
+                                                            <X size={12} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex gap-3 mt-6">
+                                    <button type="button" onClick={() => { setShowGalleryUploadModal(false); setGalleryUploadFiles([]); }} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
+                                    <button type="submit" disabled={galleryUploading} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                                        {galleryUploading ? (
+                                            <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Uploading...</>
+                                        ) : 'Upload Media'}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )
+            }
 
             {/* Lightbox Modal */}
-            {lightbox.open && lightbox.images.length > 0 && (
-                <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center" onClick={() => setLightbox({ ...lightbox, open: false })}>
-                    <button
-                        onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, open: false }); }}
-                        className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors z-10"
-                        aria-label="Close lightbox"
-                    >
-                        <X size={28} />
-                    </button>
-                    {lightbox.images.length > 1 && (
-                        <>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, index: (lightbox.index - 1 + lightbox.images.length) % lightbox.images.length }); }}
-                                className="absolute left-4 text-white/80 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors z-10"
-                                aria-label="Previous image"
-                            >
-                                <ChevronLeft size={32} />
-                            </button>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, index: (lightbox.index + 1) % lightbox.images.length }); }}
-                                className="absolute right-4 text-white/80 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors z-10"
-                                aria-label="Next image"
-                            >
-                                <ChevronRight size={32} />
-                            </button>
-                        </>
-                    )}
-                    <img
-                        src={lightbox.images[lightbox.index]?.url}
-                        alt={`Gallery image ${lightbox.index + 1}`}
-                        className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
-                    />
-                    <div className="absolute bottom-6 text-white/60 text-sm">
-                        {lightbox.index + 1} / {lightbox.images.length}
+            {
+                lightbox.open && lightbox.images.length > 0 && (
+                    <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center" onClick={() => setLightbox({ ...lightbox, open: false })}>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, open: false }); }}
+                            className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors z-10"
+                            aria-label="Close lightbox"
+                        >
+                            <X size={28} />
+                        </button>
+                        {lightbox.images.length > 1 && (
+                            <>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, index: (lightbox.index - 1 + lightbox.images.length) % lightbox.images.length }); }}
+                                    className="absolute left-4 text-white/80 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors z-10"
+                                    aria-label="Previous image"
+                                >
+                                    <ChevronLeft size={32} />
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, index: (lightbox.index + 1) % lightbox.images.length }); }}
+                                    className="absolute right-4 text-white/80 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors z-10"
+                                    aria-label="Next image"
+                                >
+                                    <ChevronRight size={32} />
+                                </button>
+                            </>
+                        )}
+                        {lightbox.images[lightbox.index]?.resource_type === 'video' ? (
+                            <video
+                                src={lightbox.images[lightbox.index]?.url}
+                                controls
+                                autoPlay
+                                className="max-w-[90vw] max-h-[85vh] rounded-lg shadow-2xl outline-none"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        ) : (
+                            <img
+                                src={lightbox.images[lightbox.index]?.url}
+                                alt={`Gallery item ${lightbox.index + 1}`}
+                                className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
+                                onClick={(e) => e.stopPropagation()}
+                            />
+                        )}
+                        <div className="absolute bottom-6 text-white/60 text-sm">
+                            {lightbox.index + 1} / {lightbox.images.length}
+                        </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* Attendees Modal */}
-            {showAttendeesModal && selectedItem && (
-                <AttendeesModal
-                    event={selectedItem}
-                    onClose={() => { setShowAttendeesModal(false); setSelectedItem(null); }}
-                    userRole={user.role}
-                    onDownloadPDF={handleDownloadPDF}
-                />
-            )}
+            {
+                showAttendeesModal && selectedItem && (
+                    <AttendeesModal
+                        event={selectedItem}
+                        onClose={() => { setShowAttendeesModal(false); setSelectedItem(null); }}
+                        userRole={user.role}
+                        onDownloadPDF={handleDownloadPDF}
+                    />
+                )
+            }
 
             <ProfileModal
                 open={showProfilePanel}
@@ -1410,7 +1440,7 @@ const FacultyDashboard = () => {
                     animation: fadeIn 0.2s ease-out;
                 }
             `}</style>
-        </div>
+        </div >
     );
 };
 

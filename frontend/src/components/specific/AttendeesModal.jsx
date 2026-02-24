@@ -3,13 +3,13 @@ import { X, Users, FileText, Search, Filter } from 'lucide-react';
 
 const BRANCHES = [
     { value: 'ALL', label: 'All Branches' },
-    { value: 'CSE', label: 'Computer Science' },
-    { value: 'IT', label: 'Information Technology' },
-    { value: 'ENTC', label: 'Electronics & Telecom' },
-    { value: 'ME', label: 'Mechanical Engineering' },
-    { value: 'CE', label: 'Civil Engineering' },
-    { value: 'EE', label: 'Electrical Engineering' },
-    { value: 'AE', label: 'Automobile Engineering' },
+    { value: 'Computer Science', label: 'Computer Science' },
+    { value: 'Information Technology', label: 'Information Technology' },
+    { value: 'Electronics and Telecommunication Engineering', label: 'Electronics & Telecom' },
+    { value: 'Mechanical Engineering', label: 'Mechanical Engineering' },
+    { value: 'Civil Engineering', label: 'Civil Engineering' },
+    { value: 'Electrical Engineering', label: 'Electrical Engineering' },
+    { value: 'Automobile Engineering', label: 'Automobile Engineering' },
 ];
 
 const YEARS = [
@@ -17,13 +17,13 @@ const YEARS = [
     { value: 'First Year', label: 'First Year' },
     { value: 'Second Year', label: 'Second Year' },
     { value: 'Third Year', label: 'Third Year' },
-    { value: 'Fourth Year', label: 'Fourth Year' },
 ];
 
 const AttendeesModal = ({ event, onClose, userRole, onDownloadPDF }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [branchFilter, setBranchFilter] = useState('ALL');
     const [yearFilter, setYearFilter] = useState('ALL');
+    const [showExportConfirm, setShowExportConfirm] = useState(false);
 
     const filteredAttendees = useMemo(() => {
         let list = (event.registrations || []).filter(a => a && typeof a === 'object' && (a.name || a.email));
@@ -178,7 +178,7 @@ const AttendeesModal = ({ event, onClose, userRole, onDownloadPDF }) => {
                 {/* Footer */}
                 <div className="p-6 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center">
                     <button
-                        onClick={() => onDownloadPDF({ ...event, registrations: filteredAttendees })}
+                        onClick={() => setShowExportConfirm(true)}
                         disabled={filteredAttendees.length === 0}
                         className="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-bold text-sm hover:shadow-xl hover:shadow-blue-500/25 transition-all flex items-center gap-2 disabled:opacity-50 active:scale-95"
                     >
@@ -193,6 +193,46 @@ const AttendeesModal = ({ event, onClose, userRole, onDownloadPDF }) => {
                     </button>
                 </div>
             </div>
+
+            {/* Export Confirmation Modal */}
+            {showExportConfirm && (
+                <div className="fixed inset-0 bg-black/50 z-[110] backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 text-center animate-fadeIn">
+                        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <FileText size={30} className="text-blue-600" />
+                        </div>
+                        <h3 className="font-bold text-xl text-slate-900 mb-2">Confirm Download</h3>
+                        <p className="text-slate-500 text-sm mb-6">
+                            Are you sure you want to download the attendee list for <span className="font-semibold text-slate-700">"{event.title}"</span>?
+                            <br />
+                            <span className="text-xs mt-2 block italic text-slate-400">
+                                This will include {filteredAttendees.length} filtered records.
+                            </span>
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowExportConfirm(false)}
+                                className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-bold text-sm transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    // Close modal first to provide immediate feedback
+                                    setShowExportConfirm(false);
+                                    // Trigger actual PDF generation and download
+                                    if (typeof onDownloadPDF === 'function') {
+                                        onDownloadPDF({ ...event, registrations: filteredAttendees });
+                                    }
+                                }}
+                                className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-sm transition-all shadow-lg shadow-blue-500/30"
+                            >
+                                Download
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
