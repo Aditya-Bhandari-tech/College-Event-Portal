@@ -7,9 +7,11 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axios';
+import { useAuth } from '../contexts/useAuth';
 import Loader from '../components/common/Loader';
 import EmptyState from '../components/common/EmptyState';
 import ProfileModal from '../components/profile/ProfileModal';
+import FacultyProfileCard from '../components/profile/FacultyProfileCard';
 import { useTheme } from '../contexts/ThemeContext';
 import DarkModeToggle from '../components/common/DarkModeToggle';
 import { jsPDF } from 'jspdf';
@@ -18,6 +20,7 @@ import AttendeesModal from '../components/specific/AttendeesModal';
 
 const FacultyDashboard = () => {
     const navigate = useNavigate();
+    const { logout: authLogout } = useAuth();
     const { darkMode, portalSettings } = useTheme();
     const [user, setUser] = useState(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -77,19 +80,13 @@ const FacultyDashboard = () => {
     });
 
     useEffect(() => {
+        // Load user from localStorage as initial state
         const storedUser = localStorage.getItem('user');
-        const token = localStorage.getItem('token');
-        if (!storedUser || !token) {
-            navigate('/login');
-            return;
+        if (storedUser) {
+            try { setUser(JSON.parse(storedUser)); } catch (_) { }
         }
-        const parsedUser = JSON.parse(storedUser);
-        if (parsedUser.role !== 'faculty') {
-            navigate('/login');
-            return;
-        }
-        setUser(parsedUser);
 
+        // Fetch fresh user data from server
         axiosInstance.get('/users/me')
             .then(res => {
                 const freshUser = res.data?.data || res.data;
@@ -102,7 +99,8 @@ const FacultyDashboard = () => {
 
         const timer = setInterval(() => setCurrentTime(new Date()), 60000);
         return () => clearInterval(timer);
-    }, [navigate]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     useEffect(() => {
         if (!user) return;
@@ -486,9 +484,12 @@ const FacultyDashboard = () => {
     };
 
     const handleLogout = () => {
+        // Clear auth data directly — no React state, no router, no timing issues
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        navigate('/login');
+        // Hard navigate forces a full page reload with empty localStorage
+        // AuthContext re-initialises fresh → isAuthenticated:false → Login shows
+        window.location.replace('/login');
     };
 
     const getGreeting = () => {
@@ -513,6 +514,33 @@ const FacultyDashboard = () => {
         </div>
     );
 
+    // Reusable section page header
+    const SectionHeader = ({ icon: Icon, title, subtitle, color = 'blue', action }) => {
+        const colors = {
+            blue: { bg: 'bg-blue-50', icon: 'bg-blue-100 text-blue-600', text: 'text-blue-700' },
+            indigo: { bg: 'bg-indigo-50', icon: 'bg-indigo-100 text-indigo-600', text: 'text-indigo-700' },
+            violet: { bg: 'bg-violet-50', icon: 'bg-violet-100 text-violet-600', text: 'text-violet-700' },
+            emerald: { bg: 'bg-emerald-50', icon: 'bg-emerald-100 text-emerald-600', text: 'text-emerald-700' },
+            amber: { bg: 'bg-amber-50', icon: 'bg-amber-100 text-amber-600', text: 'text-amber-700' },
+            rose: { bg: 'bg-rose-50', icon: 'bg-rose-100 text-rose-600', text: 'text-rose-700' },
+        };
+        const c = colors[color] || colors.blue;
+        return (
+            <div className={`rounded-2xl ${c.bg} border border-white p-4 md:p-5 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm`}>
+                <div className="flex items-center gap-3">
+                    <div className={`w-11 h-11 rounded-xl ${c.icon} flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                        <Icon size={22} />
+                    </div>
+                    <div>
+                        <h2 className="text-lg font-bold text-slate-800">{title}</h2>
+                        {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
+                    </div>
+                </div>
+                {action}
+            </div>
+        );
+    };
+
     // UI Helpers for Data Displays
     const formatDate = (dateString) => new Date(dateString).toLocaleDateString();
 
@@ -523,7 +551,8 @@ const FacultyDashboard = () => {
         { name: 'Recruitment', icon: UserPlus },
         { name: 'Students', icon: Users },
         { name: 'Announcements', icon: Bell },
-        { name: 'Gallery', icon: Image }
+        { name: 'Gallery', icon: Image },
+        { name: 'Profile', icon: User },
     ];
 
     if (!user) return <div className="min-h-screen flex items-center justify-center" role="status" aria-label="Loading"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div><span className="sr-only">Loading...</span></div>;
@@ -623,58 +652,83 @@ const FacultyDashboard = () => {
                         <div className="flex items-center gap-2 md:gap-4 flex-1 sm:flex-none justify-end">
                             {/* Dark mode toggle */}
                             <DarkModeToggle />
-                            <div className="relative">
-                                <button
-                                    onClick={() => setShowProfileMenu(!showProfileMenu)}
-                                    className="w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-sm overflow-hidden ring-2 ring-blue-500/30 shadow-md"
-                                    aria-expanded={showProfileMenu}
-                                    aria-haspopup="true"
-                                    aria-label="User menu"
-                                >
-                                    {user.profilePic?.url ? (
-                                        <img src={user.profilePic.url} alt={user.name} className="w-full h-full object-cover" />
-                                    ) : (
-                                        <span className="bg-blue-100 text-blue-600 w-full h-full flex items-center justify-center">{user.name.charAt(0)}</span>
-                                    )}
-                                </button>
-                                {showProfileMenu && (
-                                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1 animate-fadeIn z-50" role="menu">
-                                        <button onClick={() => { setShowProfilePanel(true); setShowProfileMenu(false); }} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-slate-700 flex items-center gap-2" role="menuitem">
-                                            <User size={16} /> Profile
-                                        </button>
-                                        <button onClick={handleLogout} className="w-full text-left px-4 py-2 hover:bg-slate-50 text-red-600 flex items-center gap-2" role="menuitem">
-                                            <LogOut size={16} /> Logout
-                                        </button>
-                                    </div>
+                            <button
+                                onClick={() => setShowProfilePanel(true)}
+                                className="w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-sm overflow-hidden ring-2 ring-blue-500/30 shadow-md hover:ring-blue-500/60 transition-all"
+                                aria-label="Open profile"
+                            >
+                                {user.profilePic?.url ? (
+                                    <img src={user.profilePic.url} alt={user.name} className="w-full h-full object-cover" />
+                                ) : (
+                                    <span className="bg-blue-100 text-blue-600 w-full h-full flex items-center justify-center">{user.name.charAt(0)}</span>
                                 )}
-                            </div>
+                            </button>
                         </div>
                     </div>
                 </header>
 
                 <div className="p-4 md:p-6 lg:p-8" id="main-content">
                     {/* Dashboard Overview */}
+                    {/* ── Dashboard Overview ────────────────────────────────── */}
                     {activeRoute === 'Dashboard' && (
-                        <div className="animate-fadeIn">
+                        <div className="animate-fadeIn space-y-6 md:space-y-8">
+
+                            {/* Welcome hero */}
+                            <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 p-5 md:p-7 text-white shadow-lg">
+                                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+                                <div className="relative z-10">
+                                    <p className="text-blue-200 text-sm font-medium mb-1">Faculty Portal</p>
+                                    <h2 className="text-2xl md:text-3xl font-bold">{getGreeting()}, {user.name.split(' ')[0]} 👋</h2>
+                                    <p className="text-blue-100 mt-1 text-sm">Here's an overview of your campus activity today.</p>
+                                </div>
+                            </div>
+
+                            {/* Stats */}
                             {renderStats()}
-                            <h2 className="text-lg md:text-xl font-bold mb-3 md:mb-4 text-slate-800">Quick Actions</h2>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-                                <QuickActionCard title="Create Event" icon={Plus} onClick={() => { handleRouteChange('Events'); setEventForm({ title: '', description: '', date: '', venue: '', branch: user.branch }); setShowEventModal(true); }} />
-                                <QuickActionCard title="Post Update" icon={Bell} onClick={() => { handleRouteChange('Announcements'); setAnnouncementForm({ title: '', message: '', branch: user.branch }); setShowAnnouncementModal(true); }} />
-                                <QuickActionCard title="Review Applicants" icon={UserCheck} onClick={() => handleRouteChange('Recruitment')} />
+
+                            {/* Quick Actions */}
+                            <div>
+                                <div className="flex items-center gap-2 mb-4">
+                                    <div className="w-1 h-5 bg-blue-500 rounded-full" />
+                                    <h3 className="font-bold text-slate-800 text-base">Quick Actions</h3>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+                                    {[
+                                        { title: 'Create Event', desc: 'Schedule a new campus event', icon: Plus, color: 'blue', onClick: () => { handleRouteChange('Events'); setEventForm({ title: '', description: '', date: '', venue: '', branch: user.branch }); setShowEventModal(true); } },
+                                        { title: 'Post Announcement', desc: 'Share news with students', icon: Bell, color: 'violet', onClick: () => { handleRouteChange('Announcements'); setAnnouncementForm({ title: '', message: '', branch: user.branch }); setShowAnnouncementModal(true); } },
+                                        { title: 'Review Applicants', desc: 'Check recruitment applications', icon: UserCheck, color: 'emerald', onClick: () => handleRouteChange('Recruitment') },
+                                    ].map(a => {
+                                        const gradients = { blue: 'from-blue-500 to-indigo-500', violet: 'from-violet-500 to-purple-500', emerald: 'from-emerald-500 to-teal-500' };
+                                        const Icon = a.icon;
+                                        return (
+                                            <button key={a.title} onClick={a.onClick}
+                                                className="group text-left bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-200">
+                                                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradients[a.color]} flex items-center justify-center mb-3 shadow-sm group-hover:scale-105 transition-transform`}>
+                                                    <Icon size={18} className="text-white" />
+                                                </div>
+                                                <p className="font-semibold text-slate-800 text-sm">{a.title}</p>
+                                                <p className="text-xs text-slate-500 mt-0.5">{a.desc}</p>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         </div>
                     )}
 
-                    {/* Events Management */}
+                    {/* ── Events ────────────────────────────────────────────── */}
                     {activeRoute === 'Events' && (
                         <div className="animate-fadeIn">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
-                                <h2 className="text-xl md:text-2xl font-bold text-slate-800">Manage Events</h2>
-                                <button onClick={() => { setEventForm({ title: '', description: '', date: '', venue: '', branch: user.branch }); setSelectedItem(null); setShowEventModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm w-full sm:w-auto justify-center">
-                                    <Plus size={18} /> Create Event
-                                </button>
-                            </div>
+                            <SectionHeader
+                                icon={Calendar} title="Manage Events" color="blue"
+                                subtitle={`${events.length} event${events.length !== 1 ? 's' : ''} created by you`}
+                                action={
+                                    <button onClick={() => { setEventForm({ title: '', description: '', date: '', venue: '', branch: user.branch }); setSelectedItem(null); setShowEventModal(true); }}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm w-full sm:w-auto justify-center">
+                                        <Plus size={16} /> Create Event
+                                    </button>
+                                }
+                            />
                             {loading.events ? <Loader /> : (
                                 <div className="grid gap-4">
                                     {events.map(event => (
@@ -697,205 +751,267 @@ const FacultyDashboard = () => {
                                                     </button>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2 w-full sm:w-auto">
-                                                <button onClick={() => { setSelectedItem(event); setEventForm(event); setShowEventModal(true); }} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg flex-1 sm:flex-none flex items-center justify-center" aria-label={`Edit ${event.title}`}><Edit size={18} /></button>
-                                                <button onClick={() => handleDeleteEvent(event._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg flex-1 sm:flex-none flex items-center justify-center" aria-label={`Delete ${event.title}`}><Trash size={18} /></button>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                     {events.length === 0 && <EmptyState message="No events created yet" />}
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {/* Event Requests */}
+                    {/* ── Event Requests ────────────────────────────────────── */}
                     {activeRoute === 'Event Requests' && (
                         <div className="animate-fadeIn">
-                            <h2 className={`text-xl md:text-2xl font-bold mb-4 md:mb-6 ${darkMode ? 'text-white' : 'text-slate-800'}`}>Student Event Requests</h2>
+                            <SectionHeader icon={FileText} title="Student Event Requests" color="amber"
+                                subtitle="Review and action requests from your department students" />
                             {!portalSettings.studentEventRequests ? (
-                                <div className={`rounded-2xl border-2 border-dashed p-10 text-center ${darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+                                <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50 p-10 text-center">
                                     <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                         <FileText size={24} className="text-amber-500" />
                                     </div>
-                                    <p className={`font-bold text-lg mb-1 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Student Event Requests Disabled</p>
-                                    <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>An admin has turned off student event requests in System Settings.</p>
+                                    <p className="font-bold text-amber-800 text-lg mb-1">Requests Disabled</p>
+                                    <p className="text-sm text-amber-600">An admin has turned off student event requests.</p>
                                 </div>
                             ) : loading.requests ? <Loader /> : (
-                                <div className="grid gap-4">
-                                    {requests.map(req => (
-                                        <div key={req._id} className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200">
-                                            <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <h3 className="font-bold text-base md:text-lg text-slate-800">{req.title}</h3>
-                                                        <span className={`px-2 py-0.5 text-xs rounded-full font-bold ${req.status === 'pending' ? 'bg-amber-100 text-amber-700' : req.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                            {req.status?.toUpperCase()}
-                                                        </span>
+                                <div className="space-y-3">
+                                    {requests.map(req => {
+                                        const isPending = req.status === 'pending';
+                                        const statusMap = { pending: 'bg-amber-100 text-amber-700', approved: 'bg-emerald-100 text-emerald-700', rejected: 'bg-red-100 text-red-600' };
+                                        return (
+                                            <div key={req._id} className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm hover:shadow-md transition-shadow">
+                                                <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex flex-wrap items-center gap-2 mb-2">
+                                                            <h3 className="font-bold text-slate-800 text-base">{req.title}</h3>
+                                                            <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold ${statusMap[req.status] || 'bg-slate-100 text-slate-600'}`}>
+                                                                {req.status?.toUpperCase()}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-slate-500 text-sm mb-3">{req.description}</p>
+                                                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                                                            <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-[10px] flex-shrink-0">
+                                                                {req.requestedBy?.name?.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            {req.requestedBy?.name} &bull; {req.branch}
+                                                        </div>
                                                     </div>
-                                                    <p className="text-slate-600 mt-1 text-sm">{req.description}</p>
-                                                    <p className="text-xs text-slate-500 mt-2">Requested by: {req.requestedBy?.name} ({req.branch})</p>
+                                                    {isPending && (
+                                                        <div className="flex gap-2 w-full sm:w-auto">
+                                                            <button onClick={() => handleApproveRequest(req._id)}
+                                                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm">
+                                                                <CheckCircle size={15} /> Approve
+                                                            </button>
+                                                            <button onClick={() => handleRejectRequest(req._id)}
+                                                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm">
+                                                                <XCircle size={15} /> Reject
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                {req.status === 'pending' && (
-                                                    <div className="flex gap-2 w-full sm:w-auto">
-                                                        <button onClick={() => handleApproveRequest(req._id)} className="flex-1 sm:flex-none px-3 py-1.5 bg-green-500 text-white rounded-lg text-sm hover:bg-green-600" aria-label={`Approve ${req.title}`}>Approve</button>
-                                                        <button onClick={() => handleRejectRequest(req._id)} className="flex-1 sm:flex-none px-3 py-1.5 bg-red-500 text-white rounded-lg text-sm hover:bg-red-600" aria-label={`Reject ${req.title}`}>Reject</button>
-                                                    </div>
-                                                )}
                                             </div>
-                                        </div>
-                                    ))}
-                                    {requests.length === 0 && <EmptyState message="No pending requests" />}
+                                        );
+                                    })}
+                                    {requests.length === 0 && <EmptyState message="No requests from your department yet" />}
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {/* Recruitment */}
+                    {/* ── Recruitment ───────────────────────────────────────── */}
                     {activeRoute === 'Recruitment' && (
                         <div className="animate-fadeIn">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
-                                <h2 className={`text-xl md:text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-800'}`}>Recruitments</h2>
-                                {portalSettings.recruitmentOpen && (
-                                    <button onClick={() => { setRecruitmentForm({ title: '', roleType: '', description: '', branch: user.branch, eventId: '' }); setSelectedItem(null); setShowRecruitmentModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm w-full sm:w-auto justify-center">
-                                        <Plus size={18} /> New Post
+                            <SectionHeader icon={UserPlus} title="Recruitment" color="violet"
+                                subtitle="Manage volunteer and role postings for your events"
+                                action={portalSettings.recruitmentOpen && (
+                                    <button onClick={() => { setRecruitmentForm({ title: '', roleType: '', description: '', branch: user.branch, eventId: '' }); setSelectedItem(null); setShowRecruitmentModal(true); }}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700 transition-colors shadow-sm w-full sm:w-auto justify-center">
+                                        <Plus size={16} /> New Post
                                     </button>
                                 )}
-                            </div>
+                            />
                             {!portalSettings.recruitmentOpen ? (
-                                <div className={`rounded-2xl border-2 border-dashed p-10 text-center ${darkMode ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'}`}>
+                                <div className="rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50 p-10 text-center">
                                     <div className="w-14 h-14 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                         <UserPlus size={24} className="text-rose-500" />
                                     </div>
-                                    <p className={`font-bold text-lg mb-1 ${darkMode ? 'text-slate-200' : 'text-slate-700'}`}>Recruitment Disabled</p>
-                                    <p className={`text-sm ${darkMode ? 'text-slate-500' : 'text-slate-400'}`}>An admin has turned off recruitment/volunteering in System Settings.</p>
+                                    <p className="font-bold text-rose-800 text-lg mb-1">Recruitment Disabled</p>
+                                    <p className="text-sm text-rose-500">An admin has turned off recruitment / volunteering.</p>
                                 </div>
                             ) : loading.recruitments ? <Loader /> : (
-                                <div className="grid gap-4">
+                                <div className="space-y-3">
                                     {recruitments.map(rec => (
-                                        <div key={rec._id} className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200">
+                                        <div key={rec._id} className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm hover:shadow-md transition-shadow">
                                             <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
-                                                <div className="min-w-0 flex-1">
-                                                    <h3 className="font-bold text-base md:text-lg text-slate-800">{rec.title}</h3>
-                                                    <p className="text-sm text-blue-600 font-medium mb-1">{rec.roleType} • {rec.event?.title}</p>
-                                                    <p className="text-slate-600 text-sm">{rec.description}</p>
-                                                    <div className="mt-3 flex flex-wrap items-center gap-3">
-                                                        <button onClick={() => fetchApplicants(rec._id)} className="text-sm text-blue-600 hover:underline flex items-center gap-1"><Users size={14} /> View Applicants ({rec.applicants?.length || 0})</button>
-                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${rec.status === 'open' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'}`}>{rec.status}</span>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                                                        <h3 className="font-bold text-slate-800 text-base">{rec.title}</h3>
+                                                        <span className={`text-[11px] px-2 py-0.5 rounded-full font-semibold ${rec.status === 'open' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                            {rec.status === 'open' ? 'Open' : 'Closed'}
+                                                        </span>
                                                     </div>
+                                                    <p className="text-sm text-violet-600 font-medium mb-2">{rec.roleType}{rec.event?.title ? ` · ${rec.event.title}` : ''}</p>
+                                                    <p className="text-slate-500 text-sm mb-3">{rec.description}</p>
+                                                    <button onClick={() => fetchApplicants(rec._id)}
+                                                        className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100 rounded-lg transition-colors">
+                                                        <Users size={13} /> {rec.applicants?.length || 0} Applicant{(rec.applicants?.length || 0) !== 1 ? 's' : ''}
+                                                    </button>
                                                 </div>
-                                                <div className="flex gap-2 w-full sm:w-auto">
-                                                    <button onClick={() => { setSelectedItem(rec); setRecruitmentForm(rec); setShowRecruitmentModal(true); }} className="p-2 text-slate-600 hover:bg-slate-100 rounded-lg flex-1 sm:flex-none flex items-center justify-center" aria-label={`Edit ${rec.title}`}><Edit size={18} /></button>
-                                                    <button onClick={() => handleDeleteRecruitment(rec._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg flex-1 sm:flex-none flex items-center justify-center" aria-label={`Delete ${rec.title}`}><Trash size={18} /></button>
+                                                <div className="flex sm:flex-col gap-2 sm:gap-1.5 justify-end">
+                                                    <button onClick={() => { setSelectedItem(rec); setRecruitmentForm(rec); setShowRecruitmentModal(true); }}
+                                                        className="p-2 text-slate-500 hover:text-violet-600 hover:bg-violet-50 rounded-xl transition-colors" aria-label={`Edit ${rec.title}`}><Edit size={17} /></button>
+                                                    <button onClick={() => handleDeleteRecruitment(rec._id)}
+                                                        className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors" aria-label={`Delete ${rec.title}`}><Trash size={17} /></button>
                                                 </div>
                                             </div>
                                         </div>
                                     ))}
-                                    {recruitments.length === 0 && <EmptyState message="No recruitment posts" />}
+                                    {recruitments.length === 0 && <EmptyState message="No recruitment posts yet. Create one to start recruiting!" />}
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {/* Students */}
+                    {/* ── Students ──────────────────────────────────────────── */}
                     {activeRoute === 'Students' && (
                         <div className="animate-fadeIn">
-                            <h2 className="text-xl md:text-2xl font-bold mb-4 md:mb-6 text-slate-800">Students ({user.branch})</h2>
+                            <SectionHeader icon={Users} title={`Students · ${user.branch}`} color="emerald"
+                                subtitle={`${students.length} student${students.length !== 1 ? 's' : ''} enrolled in your department`} />
                             {loading.students ? <Loader /> : (
                                 <>
                                     {/* Desktop table */}
-                                    <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                                    <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                                         <div className="overflow-x-auto">
                                             <table className="w-full text-left">
                                                 <thead className="bg-slate-50 border-b border-slate-200">
                                                     <tr>
-                                                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Name</th>
-                                                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Email</th>
-                                                        <th className="px-6 py-3 text-xs font-bold text-slate-500 uppercase">Status</th>
+                                                        <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Student</th>
+                                                        <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>
+                                                        <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-100">
-                                                    {students.map(student => (
-                                                        <tr key={student._id} className="hover:bg-slate-50">
-                                                            <td className="px-6 py-4 text-sm font-medium text-slate-900">{student.name}</td>
-                                                            <td className="px-6 py-4 text-sm text-slate-600">{student.email}</td>
-                                                            <td className="px-6 py-4">
-                                                                <span className="px-2 py-1 text-xs font-bold bg-green-100 text-green-700 rounded-full">Active</span>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
+                                                    {students.map((student, i) => {
+                                                        const colors = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500'];
+                                                        const bg = colors[i % colors.length];
+                                                        return (
+                                                            <tr key={student._id} className="hover:bg-slate-50 transition-colors">
+                                                                <td className="px-6 py-4">
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
+                                                                            {student.name?.charAt(0).toUpperCase()}
+                                                                        </div>
+                                                                        <span className="text-sm font-semibold text-slate-800">{student.name}</span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="px-6 py-4 text-sm text-slate-500">{student.email}</td>
+                                                                <td className="px-6 py-4">
+                                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-emerald-100 text-emerald-700 rounded-full">
+                                                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" /> Active
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
                                                     {students.length === 0 && (
-                                                        <tr><td colSpan="3" className="px-6 py-8 text-center text-slate-500">No students found</td></tr>
+                                                        <tr><td colSpan="3" className="px-6 py-12 text-center text-slate-400">No students found in your department</td></tr>
                                                     )}
                                                 </tbody>
                                             </table>
                                         </div>
                                     </div>
                                     {/* Mobile cards */}
-                                    <div className="md:hidden space-y-3">
-                                        {students.map(student => (
-                                            <div key={student._id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="min-w-0">
-                                                        <p className="font-semibold text-slate-900 text-sm">{student.name}</p>
+                                    <div className="md:hidden space-y-2">
+                                        {students.map((student, i) => {
+                                            const colors = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500'];
+                                            const bg = colors[i % colors.length];
+                                            return (
+                                                <div key={student._id} className="bg-white p-3.5 rounded-2xl border border-slate-200 flex items-center gap-3">
+                                                    <div className={`w-10 h-10 rounded-full ${bg} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+                                                        {student.name?.charAt(0).toUpperCase()}
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="font-semibold text-slate-800 text-sm">{student.name}</p>
                                                         <p className="text-xs text-slate-500 truncate">{student.email}</p>
                                                     </div>
-                                                    <span className="px-2 py-1 text-xs font-bold bg-green-100 text-green-700 rounded-full flex-shrink-0">Active</span>
+                                                    <span className="px-2 py-1 text-xs font-bold bg-emerald-100 text-emerald-700 rounded-full flex-shrink-0">Active</span>
                                                 </div>
-                                            </div>
-                                        ))}
-                                        {students.length === 0 && <div className="text-center py-8 text-slate-500 text-sm">No students found</div>}
+                                            );
+                                        })}
+                                        {students.length === 0 && <div className="text-center py-8 text-slate-400 text-sm">No students found</div>}
                                     </div>
                                 </>
                             )}
                         </div>
                     )}
 
-                    {/* Announcements */}
+                    {/* ── Announcements ─────────────────────────────────────── */}
                     {activeRoute === 'Announcements' && (
                         <div className="animate-fadeIn">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
-                                <h2 className="text-xl md:text-2xl font-bold text-slate-800">Announcements</h2>
-                                <button onClick={() => { setAnnouncementForm({ title: '', message: '', branch: user.branch }); setShowAnnouncementModal(true); }} className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm w-full sm:w-auto justify-center">
-                                    <Plus size={18} /> New Announcement
-                                </button>
-                            </div>
+                            <SectionHeader icon={Bell} title="Announcements" color="indigo"
+                                subtitle="Broadcast updates and news to your department"
+                                action={
+                                    <button onClick={() => { setAnnouncementForm({ title: '', message: '', branch: user.branch }); setShowAnnouncementModal(true); }}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm w-full sm:w-auto justify-center">
+                                        <Plus size={16} /> New Announcement
+                                    </button>
+                                }
+                            />
                             {loading.announcements ? <Loader /> : (
-                                <div className="space-y-4">
-                                    {announcements.map(ann => (
-                                        <article key={ann._id} className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200">
-                                            <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
-                                                <div className="min-w-0 flex-1">
-                                                    <h3 className="font-bold text-base md:text-lg text-slate-800">{ann.title}</h3>
-                                                    <p className="text-slate-600 mt-1 text-sm">{ann.message}</p>
-                                                    <div className="mt-2 text-xs text-slate-500">
-                                                        Posted on {formatDate(ann.createdAt)} by {ann.createdBy?.name || 'Unknown'}
+                                <div className="space-y-3">
+                                    {announcements.map(ann => {
+                                        const isMine = ann.createdBy === user._id || ann.createdBy?._id === user._id;
+                                        return (
+                                            <article key={ann._id} className="bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+                                                <div className="flex">
+                                                    {/* Accent bar */}
+                                                    <div className="w-1.5 bg-gradient-to-b from-indigo-500 to-violet-500 flex-shrink-0" />
+                                                    <div className="flex-1 p-4 md:p-5">
+                                                        <div className="flex justify-between items-start gap-3">
+                                                            <div className="flex-1 min-w-0">
+                                                                <h3 className="font-bold text-slate-800 text-base mb-1.5">{ann.title}</h3>
+                                                                <p className="text-slate-500 text-sm leading-relaxed">{ann.message}</p>
+                                                                <div className="flex items-center gap-3 mt-3">
+                                                                    <span className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+                                                                        <Calendar size={11} className="text-indigo-400" /> {formatDate(ann.createdAt)}
+                                                                    </span>
+                                                                    <span className="flex items-center gap-1.5 text-xs text-slate-400">
+                                                                        <div className="w-4 h-4 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-[9px]">
+                                                                            {(ann.createdBy?.name || 'U').charAt(0).toUpperCase()}
+                                                                        </div>
+                                                                        {ann.createdBy?.name || 'Unknown'}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                            {isMine && (
+                                                                <button onClick={() => handleDeleteAnnouncement(ann._id)}
+                                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors flex-shrink-0" aria-label={`Delete ${ann.title}`}>
+                                                                    <Trash size={16} />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                {(ann.createdBy === user._id || ann.createdBy?._id === user._id) && (
-                                                    <button onClick={() => handleDeleteAnnouncement(ann._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg" aria-label={`Delete ${ann.title}`}><Trash size={18} /></button>
-                                                )}
-                                            </div>
-                                        </article>
-                                    ))}
-                                    {announcements.length === 0 && <EmptyState message="No announcements" />}
+                                            </article>
+                                        );
+                                    })}
+                                    {announcements.length === 0 && <EmptyState message="No announcements yet. Post an update to notify students!" />}
                                 </div>
                             )}
                         </div>
                     )}
 
-                    {/* Gallery */}
+                    {/* ── Gallery ───────────────────────────────────────────── */}
                     {activeRoute === 'Gallery' && (
                         <div className="animate-fadeIn">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
-                                <h2 className="text-xl md:text-2xl font-bold text-slate-800">Gallery</h2>
-                                <button
-                                    onClick={() => { fetchEvents(); setGalleryUploadEventId(''); setGalleryUploadFiles([]); setShowGalleryUploadModal(true); }}
-                                    className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700 transition-colors text-sm w-full sm:w-auto justify-center"
-                                >
-                                    <Upload size={18} /> Upload Images
-                                </button>
-                            </div>
+                            <SectionHeader icon={Image} title="Photo Gallery" color="rose"
+                                subtitle="Event photos and memories from your activities"
+                                action={
+                                    <button onClick={() => { fetchEvents(); setGalleryUploadEventId(''); setGalleryUploadFiles([]); setShowGalleryUploadModal(true); }}
+                                        className="flex items-center gap-2 px-4 py-2.5 bg-rose-500 text-white rounded-xl text-sm font-semibold hover:bg-rose-600 transition-colors shadow-sm w-full sm:w-auto justify-center">
+                                        <Upload size={16} /> Upload Photos
+                                    </button>
+                                }
+                            />
                             {loading.gallery ? <Loader /> : (
                                 galleryItems.length === 0 ? (
                                     <EmptyState message="No gallery images yet. Upload photos to your events to see them here." />
@@ -956,10 +1072,39 @@ const FacultyDashboard = () => {
                         </div>
                     )}
 
+                    {/* Profile */}
+                    {activeRoute === 'Profile' && (
+                        <div className="animate-fadeIn">
+                            <h2 className={`text-xl md:text-2xl font-bold mb-4 md:mb-6 ${darkMode ? 'text-white' : 'text-slate-800'}`}>My Profile</h2>
+                            <FacultyProfileCard
+                                user={user}
+                                stats={stats}
+                                onUserUpdate={(updatedUser) => {
+                                    setUser(updatedUser);
+                                    localStorage.setItem('user', JSON.stringify(updatedUser));
+                                }}
+                                onLogout={handleLogout}
+                            />
+                        </div>
+                    )}
+
                 </div>
             </main>
 
             {/* --- MODALS --- */}
+
+            {/* Profile Modal */}
+            <ProfileModal
+                open={showProfilePanel}
+                onClose={() => setShowProfilePanel(false)}
+                user={user}
+                onUserUpdate={(updatedUser) => {
+                    setUser(updatedUser);
+                    localStorage.setItem('user', JSON.stringify(updatedUser));
+                    setShowProfilePanel(false);
+                }}
+                onLogout={handleLogout}
+            />
 
             {/* Event Modal */}
             {showEventModal && (
@@ -1252,7 +1397,7 @@ const FacultyDashboard = () => {
                 onLogout={() => {
                     localStorage.removeItem('token');
                     localStorage.removeItem('user');
-                    navigate('/login');
+                    window.location.replace('/login');
                 }}
             />
 

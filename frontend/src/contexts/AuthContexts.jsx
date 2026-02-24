@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AuthContext } from './AuthContextDefinition';
-import { authService } from '../services/authService'; 
+import { authService } from '../services/authService';
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -10,12 +10,10 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // 🔥 First check authService (from first code)
         const currentUser = authService.getCurrentUser();
         if (currentUser) {
           setUser(currentUser);
         } else {
-          // Existing localStorage fallback logic
           const token = localStorage.getItem('token');
           if (token) {
             const userData = localStorage.getItem('user');
@@ -32,16 +30,12 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  // 🔥 Enhanced login (supports authService logic)
   const login = async (email, password) => {
     try {
       const data = await authService.login(email, password);
       setUser(data.user);
-
-      // Keep localStorage logic
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
-
       return data;
     } catch (error) {
       console.error('Login error:', error);
@@ -51,27 +45,30 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     setUser(null);
-
-    // Logout from authService
-    authService.logout();
-
-    // Keep existing cleanup
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+    authService.logout(); // clears localStorage
   };
 
+  const syncUser = () => {
+    const userData = localStorage.getItem('user');
+    setUser(userData ? JSON.parse(userData) : null);
+  };
+
+  // Stable context value — only changes when user or loading actually change
+  const value = useMemo(() => ({
+    user,
+    loading,
+    login,
+    logout,
+    syncUser,
+    isAuthenticated: !!user,
+    isAdmin: user?.role === 'admin',
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [user, loading]);
+
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        loading,
-        login,
-        logout,
-        isAuthenticated: !!user,
-        isAdmin: user?.role === "admin",
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
+
