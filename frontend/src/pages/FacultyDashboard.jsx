@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
     Calendar, Users, Bell, Search, Image,
-    UserPlus, Edit, Trash, Plus, FileText, CheckCircle, XCircle,
-    UserCheck, ChevronRight, ChevronLeft, Menu, LogOut, Settings, Award, Check, X, Download,
-    Upload, Trash2, Maximize2, User, Play, ImageIcon
+    Plus, FileText, CheckCircle, XCircle,
+    UserCheck, UserPlus, ChevronRight, Menu, LogOut, Award, Check, X,
+    Upload, User, ImageIcon
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axios';
@@ -14,24 +14,425 @@ import ProfileModal from '../components/profile/ProfileModal';
 import FacultyProfileCard from '../components/profile/FacultyProfileCard';
 import { useTheme } from '../contexts/ThemeContext';
 import DarkModeToggle from '../components/common/DarkModeToggle';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import AttendeesModal from '../components/specific/AttendeesModal';
 import RecruitmentCard from '../components/specific/RecruitmentCard';
 import GalleryMediaGrid from '../components/specific/GalleryMediaGrid';
+import Events from './Events';
+import Announcements from './Announcements';
+import EventRequests from './EventRequests';
+
+// ─── HELPER COMPONENTS ────────────────────────────────────────────────────────
+
+const StatsCard = ({ icon: Icon, label, count, color }) => (
+    <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-${color}-500`}>
+        <div className="flex justify-between items-start">
+            <div>
+                <p className="text-slate-500 text-sm font-medium">{label}</p>
+                <h3 className="text-2xl font-bold mt-1">{count}</h3>
+            </div>
+            <div className={`p-2 bg-${color}-50 text-${color}-600 rounded-lg`}>
+                <Icon size={20} />
+            </div>
+        </div>
+    </div>
+);
+
+const SectionHeader = ({ icon: Icon, title, subtitle, color = 'blue', action }) => {
+    const colors = {
+        blue: { bg: 'bg-blue-50', icon: 'bg-blue-100 text-blue-600', text: 'text-blue-700' },
+        indigo: { bg: 'bg-indigo-50', icon: 'bg-indigo-100 text-indigo-600', text: 'text-indigo-700' },
+        violet: { bg: 'bg-violet-50', icon: 'bg-violet-100 text-violet-600', text: 'text-violet-700' },
+        emerald: { bg: 'bg-emerald-50', icon: 'bg-emerald-100 text-emerald-600', text: 'text-emerald-700' },
+        amber: { bg: 'bg-amber-50', icon: 'bg-amber-100 text-amber-600', text: 'text-amber-700' },
+        rose: { bg: 'bg-rose-50', icon: 'bg-rose-100 text-rose-600', text: 'text-rose-700' },
+    };
+    const c = colors[color] || colors.blue;
+    return (
+        <div className={`rounded-2xl ${c.bg} border border-white p-4 md:p-5 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm`}>
+            <div className="flex items-center gap-3">
+                <div className={`w-11 h-11 rounded-xl ${c.icon} flex items-center justify-center flex-shrink-0 shadow-sm`}>
+                    <Icon size={22} />
+                </div>
+                <div>
+                    <h2 className="text-lg font-bold text-slate-800">{title}</h2>
+                    {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
+                </div>
+            </div>
+            {action}
+        </div>
+    );
+};
+
+// ─── LOCAL VIEW COMPONENTS ───────────────────────────────────────────────────
+
+const FacultyRecruitmentView = ({ axiosInstance, user }) => {
+    const [recruitments, setRecruitments] = useState([]);
+    const [events, setEvents] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [tab, setTab] = useState('list');
+    const [expandedId, setExpandedId] = useState(null);
+    const [applicants, setApplicants] = useState({});
+    const [loadingApplicants, setLoadingApplicants] = useState({});
+    const [form, setForm] = useState({ title: '', description: '', roleType: 'volunteer', branch: user?.branch || '', eventId: '', customRole: '' });
+    const [submitting, setSubmitting] = useState(false);
+    const [formError, setFormError] = useState('');
+
+    const roleTypes = ['volunteer', 'anchor', 'coordinator', 'technical', 'other'];
+
+    const fetchRecruitments = async () => {
+        setLoading(true);
+        try {
+            const res = await axiosInstance.get('/recruitments?status=all');
+            const allRecs = res.data.data || [];
+            setRecruitments(allRecs.filter(r => r.createdBy?._id === user._id || r.createdBy === user._id));
+        } catch { } finally { setLoading(false); }
+    };
+
+    const fetchEvents = async () => {
+        try {
+            const res = await axiosInstance.get('/events');
+            const allEvents = res.data.data || [];
+            if (!user) return;
+
+            const myId = (user?._id || user?.id || '').toString();
+            const myBranch = (user?.branch || '').toUpperCase();
+
+            // EXTREMELY permissive filtering to ensure events show up
+            const filtered = allEvents.filter(e => {
+                const creatorId = (e.createdBy?._id || e.createdBy || '').toString();
+                const eventBranch = (e.branch || 'ALL').toUpperCase();
+
+                const isOwner = myId && creatorId === myId;
+                const isBranchMatch = eventBranch === myBranch ||
+                    eventBranch === 'ALL' ||
+                    myBranch === 'ALL' ||
+                    !myBranch ||
+                    !eventBranch ||
+                    myBranch.includes(eventBranch) ||
+                    eventBranch.includes(myBranch);
+
+                return isOwner || isBranchMatch;
+            });
+
+            console.log('Recruitment Events Debug:', {
+                allCount: allEvents.length,
+                filteredCount: filtered.length,
+                userBranch: myBranch,
+                userId: myId,
+                firstEvent: allEvents[0] ? { title: allEvents[0].title, branch: allEvents[0].branch, creator: allEvents[0].createdBy } : 'none'
+            });
+
+            setEvents(filtered.length > 0 ? filtered : allEvents); // Fallback to ALL if filter is too strict
+        } catch (error) {
+            console.error("Error fetching events for recruitment", error);
+        }
+    };
+
+    useEffect(() => {
+        if (!user) return;
+        fetchRecruitments();
+        fetchEvents();
+    }, [user]);
+
+    const handleCreate = async (e) => {
+        e.preventDefault();
+        if (!form.title || !form.description || !form.eventId) { setFormError('Title, description and event are required.'); return; }
+        setSubmitting(true); setFormError('');
+        try {
+            const payload = { ...form, roleType: form.roleType === 'other' ? form.customRole.trim() : form.roleType };
+            await axiosInstance.post('/recruitments', payload);
+            setForm({ title: '', description: '', roleType: 'volunteer', branch: user.branch, eventId: '', customRole: '' });
+            setTab('list');
+            fetchRecruitments();
+        } catch (err) {
+            setFormError(err.response?.data?.message || 'Failed to create recruitment post.');
+        } finally { setSubmitting(false); }
+    };
+
+    const handleDelete = async (id) => {
+        if (!window.confirm('Are you sure you want to delete this post?')) return;
+        try {
+            await axiosInstance.delete(`/recruitments/${id}`);
+            setRecruitments(prev => prev.filter(r => r._id !== id));
+        } catch { alert('Failed to delete post.'); }
+    };
+
+    const toggleApplicants = async (id) => {
+        if (expandedId === id) { setExpandedId(null); return; }
+        setExpandedId(id);
+        if (applicants[id]) return;
+        setLoadingApplicants(p => ({ ...p, [id]: true }));
+        try {
+            const res = await axiosInstance.get(`/recruitments/${id}/applicants`);
+            setApplicants(p => ({ ...p, [id]: res.data.data?.applicants || [] }));
+        } catch { setApplicants(p => ({ ...p, [id]: [] })); }
+        finally { setLoadingApplicants(p => ({ ...p, [id]: false })); }
+    };
+
+    const updateApplicantStatus = async (recruitId, applicantId, status) => {
+        try {
+            await axiosInstance.patch(`/recruitments/${recruitId}/applicants/${applicantId}`, { status });
+            setApplicants(prev => ({
+                ...prev,
+                [recruitId]: prev[recruitId].map(a => a._id === applicantId ? { ...a, status } : a),
+            }));
+        } catch { alert('Failed to update applicant status.'); }
+    };
+
+    return (
+        <div className="animate-fadeIn">
+            <div className="flex bg-white rounded-xl p-1 shadow-sm border border-slate-200 mb-6">
+                <button onClick={() => setTab('list')} className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${tab === 'list' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>List Posts</button>
+                <button onClick={() => setTab('create')} className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-semibold transition-all ${tab === 'create' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>New Post</button>
+            </div>
+
+            {tab === 'create' ? (
+                <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                    <h3 className="text-xl font-bold mb-6">Create New Recruitment Post</h3>
+                    <form onSubmit={handleCreate} className="space-y-4">
+                        {formError && <p className="text-red-500 text-sm">{formError}</p>}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Link to Event</label>
+                                <select required value={form.eventId} onChange={e => setForm({ ...form, eventId: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2">
+                                    <option value="">Select your event</option>
+                                    {events.map(e => <option key={e._id} value={e._id}>{e.title}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-semibold text-slate-700 mb-1">Role Type</label>
+                                <select value={form.roleType} onChange={e => setForm({ ...form, roleType: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+                                    {roleTypes.map(r => <option key={r} value={r}>{r.toUpperCase()}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        {form.roleType === 'other' && (
+                            <input type="text" placeholder="Specify role name..." value={form.customRole} onChange={e => setForm({ ...form, customRole: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm mt-2" />
+                        )}
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Title</label>
+                            <input type="text" required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-semibold text-slate-700 mb-1">Description</label>
+                            <textarea required value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2" rows="4"></textarea>
+                        </div>
+                        <button type="submit" disabled={submitting} className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50">
+                            {submitting ? 'Creating...' : 'Post Recruitment'}
+                        </button>
+                    </form>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {loading ? <Loader /> : (
+                        recruitments.length > 0 ? recruitments.map(rec => (
+                            <RecruitmentCard
+                                key={rec._id}
+                                rec={rec}
+                                onDelete={() => handleDelete(rec._id)}
+                                onToggleApplicants={() => toggleApplicants(rec._id)}
+                                isExpanded={expandedId === rec._id}
+                                applicants={applicants[rec._id] || []}
+                                loadingApplicants={loadingApplicants[rec._id]}
+                                userRole="faculty"
+                                onUpdateApplicantStatus={(appId, status) => updateApplicantStatus(rec._id, appId, status)}
+                                onCloseApplicants={() => setExpandedId(null)}
+                            />
+                        )) : <EmptyState message="No recruitment posts yet." />
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const FacultyGalleryView = ({ axiosInstance, user }) => {
+    const [loading, setLoading] = useState(true);
+    const [galleryData, setGalleryData] = useState([]);
+    const [generalGalleryItems, setGeneralGalleryItems] = useState([]);
+    const [showUploadForm, setShowUploadForm] = useState(false);
+    const [uploadEventId, setUploadEventId] = useState('');
+    const [uploadFiles, setUploadFiles] = useState([]);
+    const [uploading, setUploading] = useState(false);
+    const [events, setEvents] = useState([]);
+    const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
+
+    const fetchGallery = async () => {
+        setLoading(true);
+        try {
+            const [eventsRes, generalRes] = await Promise.all([
+                axiosInstance.get('/events'),
+                axiosInstance.get('/gallery')
+            ]);
+            const allEvents = eventsRes.data.data || [];
+            const myEventsWithImages = allEvents.filter(e => (e.createdBy === user._id || e.createdBy?._id === user._id) && e.images && e.images.length > 0);
+            setGalleryData(myEventsWithImages);
+            setGeneralGalleryItems(generalRes.data.data || []);
+            setEvents(allEvents.filter(e => e.createdBy?._id === user._id || e.createdBy === user._id));
+        } catch { } finally { setLoading(false); }
+    };
+
+    useEffect(() => {
+        if (user) fetchGallery();
+    }, [user]);
+
+    const handleUpload = async (e) => {
+        e.preventDefault();
+        if (!uploadEventId || uploadFiles.length === 0) return;
+        setUploading(true);
+        const formData = new FormData();
+        uploadFiles.forEach(file => formData.append('images', file));
+        try {
+            if (uploadEventId === 'unlinked') {
+                await axiosInstance.post('/gallery/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            } else {
+                await axiosInstance.post(`/events/${uploadEventId}/gallery`, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+            }
+            setShowUploadForm(false);
+            setUploadFiles([]);
+            fetchGallery();
+        } catch { alert('Upload failed.'); }
+        finally { setUploading(false); }
+    };
+
+    const handleDelete = async (eventId, publicId, generalId = null) => {
+        if (!window.confirm('Delete this media?')) return;
+        try {
+            if (generalId) {
+                await axiosInstance.delete(`/gallery/${generalId}`);
+                setGeneralGalleryItems(prev => prev.filter(img => img._id !== generalId));
+            } else {
+                await axiosInstance.delete(`/events/${eventId}/gallery/${publicId}`);
+                fetchGallery();
+            }
+        } catch { alert('Delete failed.'); }
+    };
+
+    return (
+        <div className="animate-fadeIn pb-12">
+            <SectionHeader icon={Image} title="Memories & Gallery" color="rose"
+                subtitle="Visual highlights from your department activities"
+                action={
+                    <button
+                        onClick={() => setShowUploadForm(!showUploadForm)}
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-md ${showUploadForm ? 'bg-slate-800 text-white' : 'bg-rose-500 text-white hover:bg-rose-600'}`}
+                    >
+                        {showUploadForm ? <X size={18} /> : <Upload size={18} />}
+                        {showUploadForm ? 'Close Upload' : 'Upload Media'}
+                    </button>
+                }
+            />
+
+            {showUploadForm && (
+                <div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden animate-fadeIn border border-slate-200 mb-10">
+                    <div className="relative bg-gradient-to-br from-rose-500 to-pink-600 px-8 py-10 text-center">
+                        <h2 className="text-white font-extrabold text-2xl mb-1">Add New Media</h2>
+                        <p className="text-rose-100 text-sm opacity-90">Upload photos or videos to showcase your event highlights</p>
+                    </div>
+
+                    <form onSubmit={handleUpload} className="p-8 space-y-8">
+                        <div className="space-y-2">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Destination</label>
+                            <div className="relative">
+                                <select
+                                    required
+                                    value={uploadEventId}
+                                    onChange={e => setUploadEventId(e.target.value)}
+                                    className="w-full px-6 py-4.5 border border-slate-200 bg-slate-50/50 rounded-2xl text-base font-bold focus:ring-2 focus:ring-rose-500 focus:bg-white outline-none transition-all appearance-none cursor-pointer"
+                                >
+                                    <option value="">Select Target...</option>
+                                    <option value="unlinked">General Gallery (Public)</option>
+                                    {events.map(e => <option key={e._id} value={e._id}>{e.title}</option>)}
+                                </select>
+                                <div className="absolute right-6 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                    <ChevronRight size={20} className="rotate-90" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Select Files</label>
+                            <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-slate-200 rounded-[2rem] bg-slate-50/50 hover:bg-slate-50 hover:border-rose-300 transition-all cursor-pointer group">
+                                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                                    <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-500 flex items-center justify-center mb-4 shadow-sm group-hover:scale-110 transition-transform">
+                                        <ImageIcon size={24} />
+                                    </div>
+                                    <p className="text-sm font-bold text-slate-600">
+                                        {uploadFiles.length > 0 ? `${uploadFiles.length} files selected` : 'Drop images/videos here or click'}
+                                    </p>
+                                    <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest font-black">Support: JPG, PNG, WEBP, MP4</p>
+                                </div>
+                                <input
+                                    type="file"
+                                    multiple
+                                    accept="image/*,video/*"
+                                    onChange={e => setUploadFiles(Array.from(e.target.files))}
+                                    className="hidden"
+                                />
+                            </label>
+                        </div>
+
+                        <div className="flex gap-4 pt-4">
+                            <button type="button" onClick={() => setShowUploadForm(false)} className="flex-1 py-4 px-6 border border-slate-200 rounded-2xl text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all uppercase tracking-widest">
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={uploading || uploadFiles.length === 0}
+                                className="flex-[2] py-4 px-6 bg-gradient-to-r from-rose-500 to-pink-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-rose-100 hover:shadow-rose-200 hover:-translate-y-1 transition-all uppercase tracking-widest disabled:opacity-50 disabled:translate-y-0 disabled:shadow-none"
+                            >
+                                {uploading ? 'Finalizing Upload...' : 'Star Syncing Media'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {loading ? <Loader /> : (
+                <div className="space-y-8">
+                    {generalGalleryItems.length > 0 && (
+                        <GalleryMediaGrid title="Campus Moments" subtitle="Spontaneous highlights and community memories" items={generalGalleryItems} canManage={true}
+                            onItemClick={(items, idx) => setLightbox({ open: true, images: items, index: idx })}
+                            onDelete={(pId, gId) => handleDelete(null, pId, gId)}
+                            icon={Image} gradientClasses="from-amber-50 to-orange-50/30" headerAccentClasses="bg-amber-500 shadow-amber-200" badgeClasses="text-amber-600 border-amber-200"
+                        />
+                    )}
+                    {galleryData.length > 0 ? galleryData.map(event => (
+                        <GalleryMediaGrid key={event._id} title={event.title} subtitle={`${new Date(event.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`} items={event.images} canManage={true}
+                            onItemClick={(items, idx) => setLightbox({ open: true, images: items, index: idx })}
+                            onDelete={(pId) => handleDelete(event._id, pId)}
+                            icon={Calendar}
+                        />
+                    )) : !generalGalleryItems.length && <EmptyState message="The gallery is looking a bit empty. Time to share some memories!" />}
+                </div>
+            )}
+
+            {lightbox.open && (
+                <div className="fixed inset-0 bg-black/95 z-[200] flex items-center justify-center p-4" onClick={() => setLightbox({ ...lightbox, open: false })}>
+                    <button className="absolute top-6 right-6 text-white/50 hover:text-white transition-colors"><X size={40} /></button>
+                    <div className="relative w-full max-w-7xl max-h-full flex items-center justify-center">
+                        {lightbox.images[lightbox.index]?.resource_type === 'video' ? (
+                            <video src={lightbox.images[lightbox.index]?.url} controls autoPlay className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()} />
+                        ) : (
+                            <img src={lightbox.images[lightbox.index]?.url} alt="" className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()} />
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// ─── MAIN DASHBOARD COMPONENT ────────────────────────────────────────────────
 
 const FacultyDashboard = () => {
     const navigate = useNavigate();
     const { logout: authLogout } = useAuth();
-    const { darkMode, portalSettings } = useTheme();
+    const { darkMode } = useTheme();
     const [user, setUser] = useState(null);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [activeRoute, setActiveRoute] = useState('Dashboard');
-    const [searchQuery, setSearchQuery] = useState('');
-    const [showProfileMenu, setShowProfileMenu] = useState(false);
     const [showProfilePanel, setShowProfilePanel] = useState(false);
-    const [currentTime, setCurrentTime] = useState(new Date());
 
     // Stats
     const [stats, setStats] = useState({
@@ -42,49 +443,12 @@ const FacultyDashboard = () => {
     });
 
     // Data Lists
-    const [events, setEvents] = useState([]);
-    const [requests, setRequests] = useState([]);
-    const [recruitments, setRecruitments] = useState([]);
     const [students, setStudents] = useState([]);
-    const [announcements, setAnnouncements] = useState([]);
-    const [galleryItems, setGalleryItems] = useState([]); // Old state, will be replaced by galleryData
-    const [generalGalleryItems, setGeneralGalleryItems] = useState([]);
-    const [galleryData, setGalleryData] = useState([]); // New state for event-specific gallery
-
-    // Recruitment specific
-    const [expandedRecruitment, setExpandedRecruitment] = useState(null);
-    const [recruitmentApplicants, setRecruitmentApplicants] = useState([]);
-
-    // Modals
-    const [showEventModal, setShowEventModal] = useState(false);
-    const [showRecruitmentModal, setShowRecruitmentModal] = useState(false);
-    const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
-    const [showApplicantsModal, setShowApplicantsModal] = useState(false);
-    const [showAttendeesModal, setShowAttendeesModal] = useState(false);
-    const [showGalleryUploadModal, setShowGalleryUploadModal] = useState(false);
-    const [selectedItem, setSelectedItem] = useState(null); // For edit/view applicants/attendees
-    const [selectedEventAttendees, setSelectedEventAttendees] = useState([]);
-
-    // Gallery
-    const [galleryUploadEventId, setGalleryUploadEventId] = useState('');
-    const [galleryUploadFiles, setGalleryUploadFiles] = useState([]);
-    const [galleryUploading, setGalleryUploading] = useState(false);
-    const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
-
-    // Forms
-    const [eventForm, setEventForm] = useState({ title: '', description: '', date: '', venue: '', branch: '' });
-    const [recruitmentForm, setRecruitmentForm] = useState({ title: '', roleType: '', description: '', branch: '', eventId: '' });
-    const [announcementForm, setAnnouncementForm] = useState({ title: '', message: '', branch: '' });
 
     // Loading States
     const [loading, setLoading] = useState({
         events: false,
-        requests: false,
-        recruitments: false,
-        students: false,
-        announcements: false,
-        applicants: false,
-        gallery: false
+        students: false
     });
 
     useEffect(() => {
@@ -104,426 +468,67 @@ const FacultyDashboard = () => {
                 }
             })
             .catch(() => { });
-
-        const timer = setInterval(() => setCurrentTime(new Date()), 60000);
-        return () => clearInterval(timer);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     useEffect(() => {
         if (!user) return;
-        // Initial Fetch for Stats on mount (or when dashboard is active)
         if (activeRoute === 'Dashboard') {
-            fetchEvents(true);
-            fetchStudents(true);
-        }
-    }, [user, activeRoute]);
-
-    useEffect(() => {
-        if (!user) return;
-        switch (activeRoute) {
-            case 'Events':
-                fetchEvents();
-                break;
-            case 'Event Requests':
-                fetchRequests();
-                break;
-            case 'Recruitment':
-                fetchEvents(); // Needed for dropdown
-                fetchRecruitments();
-                break;
-            case 'Students':
-                fetchStudents();
-                break;
-            case 'Announcements':
-                fetchAnnouncements();
-                break;
-            case 'Gallery':
-                fetchGallery();
-                break;
-            default:
-                break;
+            fetchStats();
+        } else if (activeRoute === 'Students') {
+            fetchStudents();
         }
     }, [activeRoute, user]);
 
-
     // API Calls
-    const fetchEvents = async (forStats = false) => {
-        if (!forStats) setLoading(prev => ({ ...prev, events: true }));
+    const fetchStats = async () => {
+        setLoading(prev => ({ ...prev, events: true }));
         try {
-            const res = await axiosInstance.get('/events');
-            const allEvents = res.data.data || [];
+            const [eventsRes, studentsRes] = await Promise.all([
+                axiosInstance.get('/events'),
+                axiosInstance.get('/users/students')
+            ]);
+            const allEvents = eventsRes.data.data || [];
+            const studentList = studentsRes.data.data || [];
 
-            if (activeRoute === 'Dashboard' || forStats) {
-                const now = new Date();
-                const ongoing = allEvents.filter(e => new Date(e.date).toDateString() === now.toDateString()).length;
-                const upcoming = allEvents.filter(e => new Date(e.date) > now).length;
-                const finished = allEvents.filter(e => new Date(e.date) < now && new Date(e.date).toDateString() !== now.toDateString()).length;
-                setStats(prev => ({ ...prev, ongoing, upcoming, finished }));
-            }
+            const now = new Date();
+            const ongoing = allEvents.filter(e => new Date(e.date).toDateString() === now.toDateString()).length;
+            const upcoming = allEvents.filter(e => new Date(e.date) > now).length;
+            const finished = allEvents.filter(e => new Date(e.date) < now && new Date(e.date).toDateString() !== now.toDateString()).length;
 
-            // Faculty manages their own events
-            const myEvents = allEvents.filter(e => e.createdBy === user._id || e.createdBy?._id === user._id);
-            setEvents(myEvents);
+            setStats({ ongoing, upcoming, finished, students: studentList.length });
         } catch (error) {
-            console.error("Error fetching events", error);
+            console.error("Error fetching stats", error);
         } finally {
-            if (!forStats) setLoading(prev => ({ ...prev, events: false }));
+            setLoading(prev => ({ ...prev, events: false }));
         }
     };
 
-    const fetchRequests = async () => {
-        setLoading(prev => ({ ...prev, requests: true }));
-        try {
-            const res = await axiosInstance.get('/event-requests');
-            const allRequests = res.data.data || [];
-            const departmentRequests = allRequests.filter(req => req.branch === user.branch);
-            setRequests(departmentRequests);
-        } catch (error) {
-            console.error("Error fetching requests", error);
-        } finally {
-            setLoading(prev => ({ ...prev, requests: false }));
-        }
-    };
-
-    const fetchRecruitments = async () => {
-        setLoading(prev => ({ ...prev, recruitments: true }));
-        try {
-            const res = await axiosInstance.get('/recruitments?status=all');
-            const allRecruitments = res.data.data || [];
-            const myRecruitments = allRecruitments.filter(r => r.createdBy?._id === user._id || r.createdBy === user._id);
-            setRecruitments(myRecruitments);
-        } catch (error) {
-            console.error("Error fetching recruitments", error);
-        } finally {
-            setLoading(prev => ({ ...prev, recruitments: false }));
-        }
-    };
-
-    const fetchStudents = async (forStats = false) => {
-        if (!forStats) setLoading(prev => ({ ...prev, students: true }));
+    const fetchStudents = async () => {
+        setLoading(prev => ({ ...prev, students: true }));
         try {
             const res = await axiosInstance.get('/users/students');
-            const studentList = res.data.data || [];
-            setStudents(studentList);
-            if (activeRoute === 'Dashboard' || forStats) {
-                setStats(prev => ({ ...prev, students: studentList.length }));
-            }
+            setStudents(res.data.data || []);
         } catch (error) {
             console.error("Error fetching students", error);
         } finally {
-            if (!forStats) setLoading(prev => ({ ...prev, students: false }));
-        }
-    };
-
-    const fetchAnnouncements = async () => {
-        setLoading(prev => ({ ...prev, announcements: true }));
-        try {
-            const res = await axiosInstance.get('/announcements');
-            const allAnnouncements = res.data.data || [];
-            setAnnouncements(allAnnouncements);
-        } catch (error) {
-            console.error("Error fetching announcements", error);
-        } finally {
-            setLoading(prev => ({ ...prev, announcements: false }));
-        }
-    };
-
-    const fetchApplicants = async (recruitmentId) => {
-        setLoading(prev => ({ ...prev, applicants: true }));
-        try {
-            const res = await axiosInstance.get(`/recruitments/${recruitmentId}/applicants`);
-            setRecruitmentApplicants(res.data.data.applicants);
-            setExpandedRecruitment(recruitmentId);
-        } catch (error) {
-            console.error("Error fetching applicants", error);
-            alert(error.response?.data?.message || "Failed to fetch applicants");
-        } finally {
-            setLoading(prev => ({ ...prev, applicants: false }));
-        }
-    };
-
-    const handleUpdateApplicantStatus = async (recruitmentId, applicantId, status) => {
-        try {
-            await axiosInstance.patch(`/recruitments/${recruitmentId}/applicants/${applicantId}`, { status });
-            // Update local state
-            setRecruitmentApplicants(prev =>
-                prev.map(app =>
-                    app._id === applicantId ? { ...app, status } : app
-                )
-            );
-        } catch (error) {
-            console.error("Update applicant status failed", error);
-            alert(error.response?.data?.message || "Failed to update applicant status");
-        }
-    };
-
-    // Gallery
-    const fetchGallery = async () => {
-        setLoading(prev => ({ ...prev, gallery: true }));
-        try {
-            const [eventsRes, generalRes] = await Promise.all([
-                axiosInstance.get('/events'),
-                axiosInstance.get('/gallery')
-            ]);
-            const allEvents = eventsRes.data.data || [];
-            // Faculty sees only their own events' images
-            const myEventsWithImages = allEvents
-                .filter(e => (e.createdBy === user._id || e.createdBy?._id === user._id) && e.images && e.images.length > 0);
-            setGalleryData(myEventsWithImages);
-            setGeneralGalleryItems(generalRes.data.data || []);
-        } catch (error) {
-            console.error('Error fetching gallery', error);
-        } finally {
-            setLoading(prev => ({ ...prev, gallery: false }));
-        }
-    };
-
-    const handleGalleryUpload = async (e) => {
-        e.preventDefault();
-        if (!galleryUploadEventId || galleryUploadFiles.length === 0) {
-            alert('Please select an event and at least one media file.');
-            return;
-        }
-        if (galleryUploadFiles.length > 10) {
-            alert('You can upload a maximum of 10 media files at a time.');
-            return;
-        }
-        setGalleryUploading(true);
-        try {
-            const formData = new FormData();
-            galleryUploadFiles.forEach(file => formData.append('images', file));
-
-            if (galleryUploadEventId === 'unlinked') {
-                await axiosInstance.post('/gallery/upload', formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' },
-                });
-            } else {
-                await axiosInstance.post(`/events/${galleryUploadEventId}/gallery`, formData, {
-                    headers: { 'Content-Type': 'multipart/form-data' },
-                });
-            }
-
-            alert('Media uploaded successfully!');
-            setShowGalleryUploadModal(false);
-            setGalleryUploadEventId('');
-            setGalleryUploadFiles([]);
-            fetchGallery();
-        } catch (error) {
-            console.error('Gallery upload failed', error);
-            alert(error.response?.data?.message || 'Failed to upload media');
-        } finally {
-            setGalleryUploading(false);
-        }
-    };
-
-    const handleDeleteGalleryImage = async (eventId, publicId, generalId = null) => {
-        if (!window.confirm('Delete this media permanently?')) return;
-        try {
-            if (generalId) {
-                await axiosInstance.delete(`/gallery/${generalId}`);
-                setGeneralGalleryItems(prev => prev.filter(img => img._id !== generalId));
-            } else {
-                await axiosInstance.delete(`/events/${eventId}/gallery/${publicId}`);
-                // Update local state
-                setGalleryData(prev => prev.map(event => {
-                    if (event._id === eventId) {
-                        return { ...event, images: event.images.filter(img => img.public_id !== publicId) };
-                    }
-                    return event;
-                }).filter(event => event.images.length > 0));
-            }
-        } catch (error) {
-            console.error('Delete gallery media failed', error);
-            alert('Failed to delete media');
-        }
-    };
-
-    // CRUD Handlers
-    const handleCreateEvent = async (e) => {
-        e.preventDefault();
-        try {
-            await axiosInstance.post('/events', eventForm);
-            alert("Event created successfully");
-            setShowEventModal(false);
-            fetchEvents();
-        } catch (error) {
-            console.error("Create event failed", error);
-            alert(error.response?.data?.message || "Failed to create event");
-        }
-    };
-
-    const handleUpdateEvent = async (e) => {
-        e.preventDefault();
-        try {
-            await axiosInstance.put(`/events/${selectedItem._id}`, eventForm);
-            alert("Event updated successfully");
-            setShowEventModal(false);
-            setSelectedItem(null);
-            fetchEvents();
-        } catch (error) {
-            console.error("Update event failed", error);
-            alert(error.response?.data?.message || "Failed to update event");
-        }
-    };
-
-    const handleDeleteEvent = async (id) => {
-        if (!window.confirm("Are you sure you want to delete this event?")) return;
-        try {
-            await axiosInstance.delete(`/events/${id}`);
-            alert("Event deleted successfully");
-            fetchEvents();
-        } catch (error) {
-            console.error("Delete event failed", error);
-            alert(error.response?.data?.message || "Failed to delete event");
-        }
-    };
-
-    const handleApproveRequest = async (id) => {
-        try {
-            await axiosInstance.patch(`/event-requests/${id}/approve`);
-            alert("Request approved");
-            fetchRequests();
-        } catch (error) {
-            console.error("Approve request failed", error);
-            alert("Failed to approve request");
-        }
-    };
-
-    const handleRejectRequest = async (id) => {
-        if (!window.confirm("Reject this request?")) return;
-        try {
-            await axiosInstance.patch(`/event-requests/${id}/reject`);
-            alert("Request rejected");
-            fetchRequests();
-        } catch (error) {
-            console.error("Reject request failed", error);
-            alert("Failed to reject request");
-        }
-    };
-
-    const handleCreateRecruitment = async (e) => {
-        e.preventDefault();
-        try {
-            await axiosInstance.post('/recruitments', recruitmentForm);
-            alert("Recruitment posted");
-            setShowRecruitmentModal(false);
-            fetchRecruitments();
-        } catch (error) {
-            console.error("Create recruitment failed", error);
-            alert(error.response?.data?.message || "Failed to post recruitment");
-        }
-    };
-
-    const handleUpdateRecruitment = async (e) => {
-        e.preventDefault();
-        try {
-            await axiosInstance.put(`/recruitments/${selectedItem._id}`, recruitmentForm);
-            alert("Recruitment updated");
-            setShowRecruitmentModal(false);
-            setSelectedItem(null);
-            fetchRecruitments();
-        } catch (error) {
-            console.error("Update recruitment failed", error);
-            alert(error.response?.data?.message || "Failed to update recruitment");
-        }
-    };
-
-    const handleDeleteRecruitment = async (id) => {
-        if (!window.confirm("Delete this recruitment?")) return;
-        try {
-            await axiosInstance.delete(`/recruitments/${id}`);
-            alert("Recruitment deleted");
-            fetchRecruitments();
-        } catch (error) {
-            console.error("Delete recruitment failed", error);
-            alert(error.response?.data?.message || "Failed to delete recruitment");
-        }
-    };
-
-    const handleCreateAnnouncement = async (e) => {
-        e.preventDefault();
-        try {
-            await axiosInstance.post('/announcements', announcementForm);
-            alert("Announcement posted");
-            setShowAnnouncementModal(false);
-            fetchAnnouncements();
-        } catch (error) {
-            console.error("Create announcement failed", error);
-            alert(error.response?.data?.message || "Failed to post announcement");
-        }
-    };
-
-    const handleDeleteAnnouncement = async (id) => {
-        if (!window.confirm("Delete this announcement?")) return;
-        try {
-            await axiosInstance.delete(`/announcements/${id}`);
-            alert("Announcement deleted");
-            fetchAnnouncements();
-        } catch (error) {
-            console.error("Delete announcement failed", error);
-            alert(error.response?.data?.message || "Failed to delete announcement");
+            setLoading(prev => ({ ...prev, students: false }));
         }
     };
 
     // Handlers
-    const handleDownloadPDF = (event) => {
-        const doc = new jsPDF();
-
-        // Add Title
-        doc.setFontSize(20);
-        doc.setTextColor(59, 130, 246); // Blue-500
-        doc.text("Registered Students List", 14, 22);
-
-        // Add Event Info
-        doc.setFontSize(12);
-        doc.setTextColor(100);
-        doc.text(`Event: ${event.title}`, 14, 32);
-        doc.text(`Date: ${new Date(event.date).toLocaleDateString()}`, 14, 38);
-        doc.text(`Venue: ${event.venue}`, 14, 44);
-        doc.text(`Exported on: ${new Date().toLocaleDateString()}`, 14, 50);
-
-        // Add Table
-        const tableColumn = ["#", "Name", "Branch", "Year", "Mobile", "Email"];
-        const tableRows = (event.registrations || []).map((student, index) => [
-            index + 1,
-            student.name,
-            student.branch,
-            student.year || 'N/A',
-            student.phone || 'N/A',
-            student.email
-        ]);
-
-        autoTable(doc, {
-            head: [tableColumn],
-            body: tableRows,
-            startY: 60,
-            theme: 'grid',
-            headStyles: { fillColor: [59, 130, 246], textColor: [255, 255, 255], fontStyle: 'bold' },
-            alternateRowStyles: { fillColor: [245, 247, 250] },
-            margin: { top: 60 },
-        });
-
-        doc.save(`${event.title.replace(/\s+/g, '_')}_Attendees.pdf`);
-    };
-
     const handleLogout = () => {
-        // Clear auth data directly — no React state, no router, no timing issues
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        // Hard navigate forces a full page reload with empty localStorage
-        // AuthContext re-initialises fresh → isAuthenticated:false → Login shows
         window.location.replace('/login');
     };
 
     const getGreeting = () => {
-        const hour = currentTime.getHours();
+        const hour = new Date().getHours();
         if (hour < 12) return 'Good Morning';
         if (hour < 17) return 'Good Afternoon';
         return 'Good Evening';
     };
 
-    // Sub-renderers
     const handleRouteChange = (route) => {
         setActiveRoute(route);
         setMobileSidebarOpen(false);
@@ -537,36 +542,6 @@ const FacultyDashboard = () => {
             <StatsCard icon={Users} label="Total Students" count={stats.students} color="amber" />
         </div>
     );
-
-    // Reusable section page header
-    const SectionHeader = ({ icon: Icon, title, subtitle, color = 'blue', action }) => {
-        const colors = {
-            blue: { bg: 'bg-blue-50', icon: 'bg-blue-100 text-blue-600', text: 'text-blue-700' },
-            indigo: { bg: 'bg-indigo-50', icon: 'bg-indigo-100 text-indigo-600', text: 'text-indigo-700' },
-            violet: { bg: 'bg-violet-50', icon: 'bg-violet-100 text-violet-600', text: 'text-violet-700' },
-            emerald: { bg: 'bg-emerald-50', icon: 'bg-emerald-100 text-emerald-600', text: 'text-emerald-700' },
-            amber: { bg: 'bg-amber-50', icon: 'bg-amber-100 text-amber-600', text: 'text-amber-700' },
-            rose: { bg: 'bg-rose-50', icon: 'bg-rose-100 text-rose-600', text: 'text-rose-700' },
-        };
-        const c = colors[color] || colors.blue;
-        return (
-            <div className={`rounded-2xl ${c.bg} border border-white p-4 md:p-5 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm`}>
-                <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-xl ${c.icon} flex items-center justify-center flex-shrink-0 shadow-sm`}>
-                        <Icon size={22} />
-                    </div>
-                    <div>
-                        <h2 className="text-lg font-bold text-slate-800">{title}</h2>
-                        {subtitle && <p className="text-sm text-slate-500 mt-0.5">{subtitle}</p>}
-                    </div>
-                </div>
-                {action}
-            </div>
-        );
-    };
-
-    // UI Helpers for Data Displays
-    const formatDate = (dateString) => new Date(dateString).toLocaleDateString();
 
     const navigation = [
         { name: 'Dashboard', icon: UserCheck },
@@ -585,34 +560,18 @@ const FacultyDashboard = () => {
         <div className={`min-h-screen font-sans transition-colors duration-300 ${darkMode ? 'dark bg-slate-950' : 'bg-[#f9f8f6]'}`}>
             {/* Mobile Sidebar Overlay */}
             {mobileSidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black/50 z-40 md:hidden"
-                    onClick={() => setMobileSidebarOpen(false)}
-                    aria-hidden="true"
-                />
+                <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setMobileSidebarOpen(false)} aria-hidden="true" />
             )}
 
             {/* Sidebar */}
-            <aside
-                className={`fixed left-0 top-0 h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white transition-all duration-300 z-50 shadow-2xl
-                    ${mobileSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'}
-                    md:translate-x-0 ${sidebarCollapsed ? 'md:w-20' : 'md:w-64'}`}
-                role="navigation"
-                aria-label="Faculty navigation"
-            >
+            <aside className={`fixed left-0 top-0 h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 text-white transition-all duration-300 z-50 shadow-2xl ${mobileSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64'} md:translate-x-0 ${sidebarCollapsed ? 'md:w-20' : 'md:w-64'}`} role="navigation">
                 <div className="flex flex-col h-full">
                     <div className="p-4 md:p-6 border-b border-slate-700/50 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center font-bold text-lg flex-shrink-0">GP</div>
-                            {(!sidebarCollapsed || mobileSidebarOpen) && <span className="font-bold text-lg">CAMPUS PULSE</span>}
+                            {(!sidebarCollapsed || mobileSidebarOpen) && <span className="font-bold text-lg uppercase tracking-tight">Campus Pulse</span>}
                         </div>
-                        <button
-                            onClick={() => setMobileSidebarOpen(false)}
-                            className="md:hidden p-2 hover:bg-slate-700 rounded-lg transition-colors"
-                            aria-label="Close navigation menu"
-                        >
-                            <X size={20} />
-                        </button>
+                        <button onClick={() => setMobileSidebarOpen(false)} className="md:hidden p-2 hover:bg-slate-700 rounded-lg transition-colors"><X size={20} /></button>
                     </div>
 
                     <nav className="flex-1 py-4 md:py-6 px-3 space-y-1 overflow-y-auto">
@@ -620,12 +579,7 @@ const FacultyDashboard = () => {
                             const Icon = item.icon;
                             const isActive = activeRoute === item.name;
                             return (
-                                <button
-                                    key={item.name}
-                                    onClick={() => handleRouteChange(item.name)}
-                                    aria-current={isActive ? 'page' : undefined}
-                                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${sidebarCollapsed && !mobileSidebarOpen ? 'justify-center' : ''}`}
-                                >
+                                <button key={item.name} onClick={() => handleRouteChange(item.name)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${sidebarCollapsed && !mobileSidebarOpen ? 'justify-center' : ''}`}>
                                     <Icon size={20} />
                                     {(!sidebarCollapsed || mobileSidebarOpen) && <span className="font-medium">{item.name}</span>}
                                 </button>
@@ -635,9 +589,7 @@ const FacultyDashboard = () => {
 
                     <div className="p-4 border-t border-slate-700/50">
                         <div className={`flex items-center gap-3 p-3 bg-slate-800/50 rounded-xl ${sidebarCollapsed && !mobileSidebarOpen ? 'justify-center' : ''}`}>
-                            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
-                                {user.name.charAt(0)}
-                            </div>
+                            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">{user.name.charAt(0)}</div>
                             {(!sidebarCollapsed || mobileSidebarOpen) && (
                                 <div className="overflow-hidden">
                                     <p className="text-sm font-semibold truncate">{user.name}</p>
@@ -646,92 +598,66 @@ const FacultyDashboard = () => {
                             )}
                         </div>
                     </div>
-
-                    <button
-                        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                        className="hidden md:flex absolute -right-3 top-8 w-6 h-6 bg-slate-800 rounded-full items-center justify-center border border-slate-700 text-slate-500 hover:text-white transition-all"
-                        aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                    >
-                        <ChevronRight size={14} className={`transition-transform ${sidebarCollapsed ? '' : 'rotate-180'}`} />
-                    </button>
                 </div>
             </aside>
 
             {/* Main Content */}
             <main className={`transition-all duration-300 ml-0 ${sidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
-                {/* Header */}
                 <header className={`sticky top-0 z-30 backdrop-blur-xl border-b shadow-sm transition-colors duration-300 ${darkMode ? 'bg-slate-900/90 border-slate-700/60' : 'bg-white/80 border-slate-200/60'}`}>
                     <div className="px-4 md:px-8 py-3 md:py-4 flex items-center justify-between gap-4">
-                        {/* Mobile hamburger */}
-                        <button
-                            onClick={() => setMobileSidebarOpen(true)}
-                            className="md:hidden p-2 hover:bg-slate-100 rounded-xl transition-colors"
-                            aria-label="Open navigation menu"
-                        >
-                            <Menu size={24} className="text-slate-700" />
-                        </button>
+                        <button onClick={() => setMobileSidebarOpen(true)} className="md:hidden p-2 hover:bg-slate-100 rounded-xl transition-colors"><Menu size={24} className="text-slate-700" /></button>
                         <div className="hidden sm:block">
                             <h1 className={`text-lg md:text-2xl font-bold ${darkMode ? 'text-white' : 'text-slate-900'}`}>{getGreeting()}, <span className="text-blue-500">{user.name.split(' ')[0]}</span></h1>
                         </div>
                         <div className="flex items-center gap-2 md:gap-4 flex-1 sm:flex-none justify-end">
-                            {/* Dark mode toggle */}
                             <DarkModeToggle />
-                            <button
-                                onClick={() => setShowProfilePanel(true)}
-                                className="w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-sm overflow-hidden ring-2 ring-blue-500/30 shadow-md hover:ring-blue-500/60 transition-all"
-                                aria-label="Open profile"
-                            >
-                                {user.profilePic?.url ? (
-                                    <img src={user.profilePic.url} alt={user.name} className="w-full h-full object-cover" />
-                                ) : (
-                                    <span className="bg-blue-100 text-blue-600 w-full h-full flex items-center justify-center">{user.name.charAt(0)}</span>
-                                )}
+                            <button onClick={() => setShowProfilePanel(true)} className="w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-sm overflow-hidden ring-2 ring-blue-500/30 shadow-md hover:ring-blue-500/60 transition-all">
+                                {user.profilePic?.url ? <img src={user.profilePic.url} alt={user.name} className="w-full h-full object-cover" /> : <span className="bg-blue-100 text-blue-600 w-full h-full flex items-center justify-center">{user.name.charAt(0)}</span>}
                             </button>
                         </div>
                     </div>
                 </header>
 
-                <div className="p-4 md:p-6 lg:p-8" id="main-content">
-                    {/* Dashboard Overview */}
-                    {/* ── Dashboard Overview ────────────────────────────────── */}
+                <div className="p-4 md:p-6 lg:p-8">
                     {activeRoute === 'Dashboard' && (
                         <div className="animate-fadeIn space-y-6 md:space-y-8">
-
-                            {/* Welcome hero */}
-                            <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 p-5 md:p-7 text-white shadow-lg">
-                                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
-                                <div className="relative z-10">
-                                    <p className="text-blue-200 text-sm font-medium mb-1">Faculty Portal</p>
-                                    <h2 className="text-2xl md:text-3xl font-bold">{getGreeting()}, {user.name.split(' ')[0]} 👋</h2>
-                                    <p className="text-blue-100 mt-1 text-sm">Here's an overview of your campus activity today.</p>
+                            <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 p-6 md:p-10 text-white shadow-xl">
+                                <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
+                                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                                    <div>
+                                        <p className="text-blue-200 text-sm font-bold uppercase tracking-widest mb-2">Faculty Portal</p>
+                                        <h2 className="text-3xl md:text-4xl font-black">{getGreeting()}, {user.name.split(' ')[0]} 👋</h2>
+                                        <p className="text-blue-100 mt-2 text-base max-w-md opacity-90">Manage your department activities, events, and student engagements from one central hub.</p>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button onClick={() => setShowProfilePanel(true)} className="px-5 py-2.5 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-xl border border-white/20 transition-all font-semibold text-sm">View Profile</button>
+                                        <button onClick={() => handleRouteChange('Events')} className="px-5 py-2.5 bg-white text-blue-600 rounded-xl font-bold text-sm shadow-lg hover:shadow-white/20 hover:scale-105 transition-all">Create Event</button>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Stats */}
                             {renderStats()}
 
-                            {/* Quick Actions */}
                             <div>
                                 <div className="flex items-center gap-2 mb-4">
-                                    <div className="w-1 h-5 bg-blue-500 rounded-full" />
-                                    <h3 className="font-bold text-slate-800 text-base">Quick Actions</h3>
+                                    <div className="w-1.5 h-6 bg-blue-500 rounded-full" />
+                                    <h3 className="font-extrabold text-slate-800 text-lg">Quick Actions</h3>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
                                     {[
-                                        { title: 'Create Event', desc: 'Schedule a new campus event', icon: Plus, color: 'blue', onClick: () => { handleRouteChange('Events'); setEventForm({ title: '', description: '', date: '', venue: '', branch: user.branch }); setShowEventModal(true); } },
-                                        { title: 'Post Announcement', desc: 'Share news with students', icon: Bell, color: 'violet', onClick: () => { handleRouteChange('Announcements'); setAnnouncementForm({ title: '', message: '', branch: user.branch }); setShowAnnouncementModal(true); } },
+                                        { title: 'Create Event', desc: 'Schedule a new campus event', icon: Plus, color: 'blue', onClick: () => handleRouteChange('Events') },
+                                        { title: 'Post Announcement', desc: 'Share news with students', icon: Bell, color: 'violet', onClick: () => handleRouteChange('Announcements') },
                                         { title: 'Review Applicants', desc: 'Check recruitment applications', icon: UserCheck, color: 'emerald', onClick: () => handleRouteChange('Recruitment') },
                                     ].map(a => {
                                         const gradients = { blue: 'from-blue-500 to-indigo-500', violet: 'from-violet-500 to-purple-500', emerald: 'from-emerald-500 to-teal-500' };
                                         const Icon = a.icon;
                                         return (
-                                            <button key={a.title} onClick={a.onClick}
-                                                className="group text-left bg-white border border-slate-200 hover:border-slate-300 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all duration-200">
-                                                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${gradients[a.color]} flex items-center justify-center mb-3 shadow-sm group-hover:scale-105 transition-transform`}>
-                                                    <Icon size={18} className="text-white" />
+                                            <button key={a.title} onClick={a.onClick} className="group text-left bg-white border border-slate-100 hover:border-blue-200 rounded-3xl p-6 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                                                <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${gradients[a.color]} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform`}>
+                                                    <Icon size={22} className="text-white" />
                                                 </div>
-                                                <p className="font-semibold text-slate-800 text-sm">{a.title}</p>
-                                                <p className="text-xs text-slate-500 mt-0.5">{a.desc}</p>
+                                                <p className="font-bold text-slate-900 text-base">{a.title}</p>
+                                                <p className="text-sm text-slate-500 mt-1 leading-relaxed">{a.desc}</p>
                                             </button>
                                         );
                                     })}
@@ -740,734 +666,70 @@ const FacultyDashboard = () => {
                         </div>
                     )}
 
-                    {/* ── Events ────────────────────────────────────────────── */}
-                    {activeRoute === 'Events' && (
-                        <div className="animate-fadeIn">
-                            <SectionHeader
-                                icon={Calendar} title="Manage Events" color="blue"
-                                subtitle={`${events.length} event${events.length !== 1 ? 's' : ''} created by you`}
-                                action={
-                                    <button onClick={() => { setEventForm({ title: '', description: '', date: '', venue: '', branch: user.branch }); setSelectedItem(null); setShowEventModal(true); }}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-semibold hover:bg-blue-700 transition-colors shadow-sm w-full sm:w-auto justify-center">
-                                        <Plus size={16} /> Create Event
-                                    </button>
-                                }
-                            />
-                            {loading.events ? <Loader /> : (
-                                <div className="grid gap-4">
-                                    {events.map(event => (
-                                        <div key={event._id} className="bg-white p-4 md:p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                                            <div className="min-w-0 flex-1">
-                                                <h3 className="font-bold text-base md:text-lg text-slate-800">{event.title}</h3>
-                                                <p className="text-slate-600 text-sm line-clamp-2">{event.description}</p>
-                                                <div className="flex flex-wrap gap-3 md:gap-4 mt-2 text-xs text-slate-500">
-                                                    <span className="flex items-center gap-1"><Calendar size={14} /> {formatDate(event.date)}</span>
-                                                    <span className="flex items-center gap-1"><Users size={14} /> {event.branch}</span>
-                                                    <button
-                                                        onClick={() => {
-                                                            setSelectedEventAttendees(event.registrations || []);
-                                                            setSelectedItem(event);
-                                                            setShowAttendeesModal(true);
-                                                        }}
-                                                        className="flex items-center gap-1 text-blue-600 hover:underline font-medium"
-                                                    >
-                                                        <Users size={14} /> View Attendees ({event.registrations?.length || 0})
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {events.length === 0 && <EmptyState message="No events created yet" />}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* ── Event Requests ────────────────────────────────────── */}
-                    {activeRoute === 'Event Requests' && (
-                        <div className="animate-fadeIn">
-                            <SectionHeader icon={FileText} title="Student Event Requests" color="amber"
-                                subtitle="Review and action requests from your department students" />
-                            {!portalSettings.studentEventRequests ? (
-                                <div className="rounded-2xl border-2 border-dashed border-amber-200 bg-amber-50 p-10 text-center">
-                                    <div className="w-14 h-14 bg-amber-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                        <FileText size={24} className="text-amber-500" />
-                                    </div>
-                                    <p className="font-bold text-amber-800 text-lg mb-1">Requests Disabled</p>
-                                    <p className="text-sm text-amber-600">An admin has turned off student event requests.</p>
-                                </div>
-                            ) : loading.requests ? <Loader /> : (
-                                <div className="space-y-3">
-                                    {requests.map(req => {
-                                        const isPending = req.status === 'pending';
-                                        const statusMap = { pending: 'bg-amber-100 text-amber-700', approved: 'bg-emerald-100 text-emerald-700', rejected: 'bg-red-100 text-red-600' };
-                                        return (
-                                            <div key={req._id} className="bg-white border border-slate-200 rounded-2xl p-4 md:p-5 shadow-sm hover:shadow-md transition-shadow">
-                                                <div className="flex flex-col sm:flex-row justify-between items-start gap-3">
-                                                    <div className="flex-1 min-w-0">
-                                                        <div className="flex flex-wrap items-center gap-2 mb-2">
-                                                            <h3 className="font-bold text-slate-800 text-base">{req.title}</h3>
-                                                            <span className={`text-[11px] px-2.5 py-0.5 rounded-full font-bold ${statusMap[req.status] || 'bg-slate-100 text-slate-600'}`}>
-                                                                {req.status?.toUpperCase()}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-slate-500 text-sm mb-3">{req.description}</p>
-                                                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                                                            <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold text-[10px] flex-shrink-0">
-                                                                {req.requestedBy?.name?.charAt(0).toUpperCase()}
-                                                            </div>
-                                                            {req.requestedBy?.name} &bull; {req.branch}
-                                                        </div>
-                                                    </div>
-                                                    {isPending && (
-                                                        <div className="flex gap-2 w-full sm:w-auto">
-                                                            <button onClick={() => handleApproveRequest(req._id)}
-                                                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm">
-                                                                <CheckCircle size={15} /> Approve
-                                                            </button>
-                                                            <button onClick={() => handleRejectRequest(req._id)}
-                                                                className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-3.5 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-sm font-semibold transition-colors shadow-sm">
-                                                                <XCircle size={15} /> Reject
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                    {requests.length === 0 && <EmptyState message="No requests from your department yet" />}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* ── Recruitment ───────────────────────────────────────── */}
-                    {activeRoute === 'Recruitment' && (
-                        <div className="animate-fadeIn">
-                            <SectionHeader icon={UserPlus} title="Recruitment" color="violet"
-                                subtitle="Manage volunteer and role postings for your events"
-                                action={portalSettings.recruitmentOpen && (
-                                    <button onClick={() => { setRecruitmentForm({ title: '', roleType: '', description: '', branch: user.branch, eventId: '' }); setSelectedItem(null); setShowRecruitmentModal(true); }}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700 transition-colors shadow-sm w-full sm:w-auto justify-center">
-                                        <Plus size={16} /> New Post
-                                    </button>
-                                )}
-                            />
-                            {!portalSettings.recruitmentOpen ? (
-                                <div className="rounded-2xl border-2 border-dashed border-rose-200 bg-rose-50 p-10 text-center">
-                                    <div className="w-14 h-14 bg-rose-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                                        <UserPlus size={24} className="text-rose-500" />
-                                    </div>
-                                    <p className="font-bold text-rose-800 text-lg mb-1">Recruitment Disabled</p>
-                                    <p className="text-sm text-rose-500">An admin has turned off recruitment / volunteering.</p>
-                                </div>
-                            ) : loading.recruitments ? <Loader /> : (
-                                <div className="space-y-3">
-                                    {recruitments.map(rec => (
-                                        <RecruitmentCard
-                                            key={rec._id}
-                                            rec={rec}
-                                            onEdit={(r) => { setSelectedItem(r); setRecruitmentForm(r); setShowRecruitmentModal(true); }}
-                                            onDelete={handleDeleteRecruitment}
-                                            onToggleApplicants={fetchApplicants}
-                                            isExpanded={expandedRecruitment === rec._id}
-                                            applicants={recruitmentApplicants}
-                                            loadingApplicants={loading.applicants}
-                                            userRole="faculty"
-                                            onUpdateApplicantStatus={handleUpdateApplicantStatus}
-                                            onCloseApplicants={() => { setExpandedRecruitment(null); setRecruitmentApplicants([]); }}
-                                        />
-                                    ))}
-                                    {recruitments.length === 0 && <EmptyState message="No recruitment posts yet. Create one to start recruiting!" />}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* ── Students ──────────────────────────────────────────── */}
+                    {activeRoute === 'Events' && <Events userRole={user.role} user={user} />}
+                    {activeRoute === 'Event Requests' && <EventRequests />}
+                    {activeRoute === 'Recruitment' && <FacultyRecruitmentView axiosInstance={axiosInstance} user={user} />}
                     {activeRoute === 'Students' && (
                         <div className="animate-fadeIn">
-                            <SectionHeader icon={Users} title={`Students · ${user.branch}`} color="emerald"
-                                subtitle={`${students.length} student${students.length !== 1 ? 's' : ''} enrolled in your department`} />
+                            <SectionHeader icon={Users} title={`Students · ${user.branch}`} color="emerald" subtitle={`${students.length} student${students.length !== 1 ? 's' : ''} in your department`} />
                             {loading.students ? <Loader /> : (
-                                <>
-                                    {/* Desktop table */}
-                                    <div className="hidden md:block bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left">
-                                                <thead className="bg-slate-50 border-b border-slate-200">
-                                                    <tr>
-                                                        <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Student</th>
-                                                        <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Email</th>
-                                                        <th className="px-6 py-3.5 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-slate-100">
-                                                    {students.map((student, i) => {
-                                                        const colors = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500'];
-                                                        const bg = colors[i % colors.length];
-                                                        return (
-                                                            <tr key={student._id} className="hover:bg-slate-50 transition-colors">
-                                                                <td className="px-6 py-4">
-                                                                    <div className="flex items-center gap-3">
-                                                                        <div className={`w-9 h-9 rounded-full ${bg} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
-                                                                            {student.name?.charAt(0).toUpperCase()}
-                                                                        </div>
-                                                                        <span className="text-sm font-semibold text-slate-800">{student.name}</span>
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-sm text-slate-500">{student.email}</td>
-                                                                <td className="px-6 py-4">
-                                                                    <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-emerald-100 text-emerald-700 rounded-full">
-                                                                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full" /> Active
-                                                                    </span>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                    {students.length === 0 && (
-                                                        <tr><td colSpan="3" className="px-6 py-12 text-center text-slate-400">No students found in your department</td></tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                    {/* Mobile cards */}
-                                    <div className="md:hidden space-y-2">
-                                        {students.map((student, i) => {
-                                            const colors = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-500', 'bg-indigo-500'];
-                                            const bg = colors[i % colors.length];
-                                            return (
-                                                <div key={student._id} className="bg-white p-3.5 rounded-2xl border border-slate-200 flex items-center gap-3">
-                                                    <div className={`w-10 h-10 rounded-full ${bg} flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
-                                                        {student.name?.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="font-semibold text-slate-800 text-sm">{student.name}</p>
-                                                        <p className="text-xs text-slate-500 truncate">{student.email}</p>
-                                                    </div>
-                                                    <span className="px-2 py-1 text-xs font-bold bg-emerald-100 text-emerald-700 rounded-full flex-shrink-0">Active</span>
-                                                </div>
-                                            );
-                                        })}
-                                        {students.length === 0 && <div className="text-center py-8 text-slate-400 text-sm">No students found</div>}
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                    )}
-
-                    {/* ── Announcements ─────────────────────────────────────── */}
-                    {activeRoute === 'Announcements' && (
-                        <div className="animate-fadeIn">
-                            <SectionHeader icon={Bell} title="Announcements" color="indigo"
-                                subtitle="Broadcast updates and news to your department"
-                                action={
-                                    <button onClick={() => { setAnnouncementForm({ title: '', message: '', branch: user.branch }); setShowAnnouncementModal(true); }}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 transition-colors shadow-sm w-full sm:w-auto justify-center">
-                                        <Plus size={16} /> New Announcement
-                                    </button>
-                                }
-                            />
-                            {loading.announcements ? <Loader /> : (
-                                <div className="space-y-3">
-                                    {announcements.map(ann => {
-                                        const isMine = ann.createdBy === user._id || ann.createdBy?._id === user._id;
-                                        return (
-                                            <article key={ann._id} className="bg-white border border-slate-200 rounded-2xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
-                                                <div className="flex">
-                                                    {/* Accent bar */}
-                                                    <div className="w-1.5 bg-gradient-to-b from-indigo-500 to-violet-500 flex-shrink-0" />
-                                                    <div className="flex-1 p-4 md:p-5">
-                                                        <div className="flex justify-between items-start gap-3">
-                                                            <div className="flex-1 min-w-0">
-                                                                <h3 className="font-bold text-slate-800 text-base mb-1.5">{ann.title}</h3>
-                                                                <p className="text-slate-500 text-sm leading-relaxed">{ann.message}</p>
-                                                                <div className="flex items-center gap-3 mt-3">
-                                                                    <span className="flex items-center gap-1.5 text-xs text-slate-400 bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
-                                                                        <Calendar size={11} className="text-indigo-400" /> {formatDate(ann.createdAt)}
-                                                                    </span>
-                                                                    <span className="flex items-center gap-1.5 text-xs text-slate-400">
-                                                                        <div className="w-4 h-4 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-[9px]">
-                                                                            {(ann.createdBy?.name || 'U').charAt(0).toUpperCase()}
-                                                                        </div>
-                                                                        {ann.createdBy?.name || 'Unknown'}
-                                                                    </span>
+                                <div className="bg-white rounded-3xl shadow-md border border-slate-100 overflow-hidden">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-slate-50 border-b border-slate-100">
+                                                <tr>
+                                                    <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Student</th>
+                                                    <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">Email</th>
+                                                    <th className="px-6 py-4 text-xs font-black text-slate-500 uppercase tracking-widest text-center">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-50">
+                                                {students.map((student, i) => {
+                                                    const initials = student.name?.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+                                                    return (
+                                                        <tr key={student._id} className="hover:bg-slate-50/50 transition-colors">
+                                                            <td className="px-6 py-5">
+                                                                <div className="flex items-center gap-4">
+                                                                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center text-slate-700 text-sm font-bold shadow-sm">{initials}</div>
+                                                                    <span className="text-sm font-bold text-slate-800">{student.name}</span>
                                                                 </div>
-                                                            </div>
-                                                            {isMine && (
-                                                                <button onClick={() => handleDeleteAnnouncement(ann._id)}
-                                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors flex-shrink-0" aria-label={`Delete ${ann.title}`}>
-                                                                    <Trash size={16} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </article>
-                                        );
-                                    })}
-                                    {announcements.length === 0 && <EmptyState message="No announcements yet. Post an update to notify students!" />}
+                                                            </td>
+                                                            <td className="px-6 py-5 text-sm font-medium text-slate-500">{student.email}</td>
+                                                            <td className="px-6 py-5 text-center">
+                                                                <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-black bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 uppercase tracking-tighter shadow-sm">Active</span>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                                {students.length === 0 && (
+                                                    <tr><td colSpan="3" className="px-6 py-16 text-center text-slate-400 font-medium font-italic">No students found</td></tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             )}
                         </div>
                     )}
-
-                    {/* ── Gallery ───────────────────────────────────────────── */}
-                    {activeRoute === 'Gallery' && (
-                        <div className="animate-fadeIn">
-                            <SectionHeader icon={Image} title="Photo Gallery" color="rose"
-                                subtitle="Event photos and memories from your activities"
-                                action={
-                                    <button onClick={() => { fetchEvents(); setGalleryUploadEventId(''); setGalleryUploadFiles([]); setShowGalleryUploadModal(true); }}
-                                        className="flex items-center gap-2 px-4 py-2.5 bg-rose-500 text-white rounded-xl text-sm font-semibold hover:bg-rose-600 transition-colors shadow-sm w-full sm:w-auto justify-center">
-                                        <Upload size={16} /> Upload Photos
-                                    </button>
-                                }
-                            />
-                            {loading.gallery ? <Loader /> : (
-                                <div className="space-y-6">
-                                    {/* General Gallery Section */}
-                                    {generalGalleryItems.length > 0 && (
-                                        <GalleryMediaGrid
-                                            title="General Gallery"
-                                            subtitle="Capture spontaneous moments & memories"
-                                            items={generalGalleryItems}
-                                            onItemClick={(items, idx) => setLightbox({ open: true, images: items, index: idx })}
-                                            onDelete={(pId, gId) => handleDeleteGalleryImage(null, pId, gId)}
-                                            canManage={true}
-                                            icon={Search}
-                                            gradientClasses="from-amber-50 to-orange-50/30"
-                                            headerAccentClasses="bg-amber-500 shadow-amber-200"
-                                            badgeClasses="text-amber-600 border-amber-200"
-                                        />
-                                    )}
-
-                                    {/* Event Gallery Sections */}
-                                    {galleryData.length === 0 && generalGalleryItems.length === 0 ? (
-                                        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-3xl border border-dashed border-slate-300 shadow-sm">
-                                            <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center mb-4 text-slate-300">
-                                                <ImageIcon size={32} />
-                                            </div>
-                                            <h3 className="font-bold text-slate-600">No media yet</h3>
-                                            <p className="text-slate-400 text-sm">Upload images or videos to display them here.</p>
-                                        </div>
-                                    ) : (
-                                        galleryData.filter(event => event.images && event.images.length > 0).map(event => (
-                                            <GalleryMediaGrid
-                                                key={event._id}
-                                                title={event.title}
-                                                subtitle={`${new Date(event.date).toLocaleDateString()} · ${event.venue}`}
-                                                items={event.images}
-                                                onItemClick={(items, idx) => setLightbox({ open: true, images: items, index: idx })}
-                                                onDelete={(pId) => handleDeleteGalleryImage(event._id, pId)}
-                                                canManage={true}
-                                                icon={Calendar}
-                                            />
-                                        ))
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {/* --- Profile --- */}
+                    {activeRoute === 'Announcements' && <Announcements userRole={user.role} user={user} />}
+                    {activeRoute === 'Gallery' && <FacultyGalleryView axiosInstance={axiosInstance} user={user} />}
                     {activeRoute === 'Profile' && (
-                        <div className="animate-fadeIn">
-                            <h2 className={`text-xl md:text-2xl font-bold mb-4 md:mb-6 ${darkMode ? 'text-white' : 'text-slate-800'}`}>My Profile</h2>
-                            <FacultyProfileCard
-                                user={user}
-                                stats={stats}
-                                onUserUpdate={(updatedUser) => {
-                                    setUser(updatedUser);
-                                    localStorage.setItem('user', JSON.stringify(updatedUser));
-                                }}
-                                onLogout={handleLogout}
-                            />
+                        <div className="animate-fadeIn max-w-4xl mx-auto">
+                            <SectionHeader icon={User} title="Faculty Profile" color="blue" subtitle="Manage your account settings and personal information" />
+                            <FacultyProfileCard user={user} stats={stats} onUserUpdate={(u) => { setUser(u); localStorage.setItem('user', JSON.stringify(u)); }} onLogout={handleLogout} />
                         </div>
                     )}
+                </div>
+            </main>
 
-                </div >
-            </main >
-
-            {/* --- MODALS --- */}
-
-            {/* Profile Modal */}
-            <ProfileModal
-                open={showProfilePanel}
-                onClose={() => setShowProfilePanel(false)}
-                user={user}
-                onUserUpdate={(updatedUser) => {
-                    setUser(updatedUser);
-                    localStorage.setItem('user', JSON.stringify(updatedUser));
-                    setShowProfilePanel(false);
-                }}
-                onLogout={handleLogout}
-            />
-
-            {/* Event Modal */}
-            {
-                showEventModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="event-modal-title">
-                        <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
-                            <h3 id="event-modal-title" className="text-lg md:text-xl font-bold mb-4">{selectedItem ? 'Edit Event' : 'Create New Event'}</h3>
-                            <form onSubmit={selectedItem ? handleUpdateEvent : handleCreateEvent} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Event Title</label>
-                                    <input type="text" required value={eventForm.title} onChange={e => setEventForm({ ...eventForm, title: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                                    <textarea required value={eventForm.description} onChange={e => setEventForm({ ...eventForm, description: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows="3"></textarea>
-                                </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
-                                        <input type="datetime-local" required value={eventForm.date} onChange={e => setEventForm({ ...eventForm, date: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-700 mb-1">Venue</label>
-                                        <input type="text" required value={eventForm.venue} onChange={e => setEventForm({ ...eventForm, venue: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Branch</label>
-                                    <input type="text" disabled value={eventForm.branch} className="w-full border border-slate-300 bg-slate-100 rounded-lg px-3 py-2 text-slate-500 cursor-not-allowed" />
-                                </div>
-                                <div className="flex gap-3 mt-6">
-                                    <button type="button" onClick={() => setShowEventModal(false)} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
-                                    <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Event</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Recruitment Modal */}
-            {
-                showRecruitmentModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="recruitment-modal-title">
-                        <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
-                            <h3 id="recruitment-modal-title" className="text-lg md:text-xl font-bold mb-4">{selectedItem ? 'Edit Recruitment' : 'New Recruitment'}</h3>
-                            <form onSubmit={selectedItem ? handleUpdateRecruitment : handleCreateRecruitment} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
-                                    <input type="text" required value={recruitmentForm.title} onChange={e => setRecruitmentForm({ ...recruitmentForm, title: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Role Type</label>
-                                    <select required value={recruitmentForm.roleType} onChange={e => setRecruitmentForm({ ...recruitmentForm, roleType: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                                        <option value="">Select Role</option>
-                                        <option value="volunteer">Volunteer</option>
-                                        <option value="anchor">Anchor</option>
-                                        <option value="coordinator">Coordinator</option>
-                                        <option value="technical">Technical</option>
-                                        <option value="other">Other</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Linked Event</label>
-                                    <select required value={recruitmentForm.eventId} onChange={e => setRecruitmentForm({ ...recruitmentForm, eventId: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none">
-                                        <option value="">Select Event</option>
-                                        {events.map(e => <option key={e._id} value={e._id}>{e.title}</option>)}
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
-                                    <textarea required value={recruitmentForm.description} onChange={e => setRecruitmentForm({ ...recruitmentForm, description: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows="3"></textarea>
-                                </div>
-                                <div className="flex gap-3 mt-6">
-                                    <button type="button" onClick={() => setShowRecruitmentModal(false)} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
-                                    <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Post</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Announcement Modal */}
-            {
-                showAnnouncementModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="announcement-modal-title">
-                        <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
-                            <h3 id="announcement-modal-title" className="text-lg md:text-xl font-bold mb-4">New Announcement</h3>
-                            <form onSubmit={handleCreateAnnouncement} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
-                                    <input type="text" required value={announcementForm.title} onChange={e => setAnnouncementForm({ ...announcementForm, title: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Message</label>
-                                    <textarea required value={announcementForm.message} onChange={e => setAnnouncementForm({ ...announcementForm, message: e.target.value })} className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" rows="4"></textarea>
-                                </div>
-                                <div className="flex gap-3 mt-6">
-                                    <button type="button" onClick={() => setShowAnnouncementModal(false)} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
-                                    <button type="submit" className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Post</button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Applicants Modal */}
-            {
-                showApplicantsModal && selectedItem && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="applicants-modal-title">
-                        <div className="bg-white rounded-2xl w-full max-w-3xl p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[85vh] overflow-y-auto">
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 id="applicants-modal-title" className="text-lg md:text-xl font-bold">Applicants</h3>
-                                <button onClick={() => setShowApplicantsModal(false)} className="p-2 hover:bg-slate-100 rounded-full" aria-label="Close applicants modal"><X size={20} /></button>
-                            </div>
-
-                            <div className="space-y-4">
-                                {selectedItem.applicants?.map(app => (
-                                    <div key={app._id} className="border border-slate-200 rounded-lg p-3 md:p-4 flex flex-col sm:flex-row justify-between items-start gap-3">
-                                        <div className="min-w-0 flex-1">
-                                            <p className="font-bold text-slate-900 text-sm md:text-base">{app.student?.name || 'Unknown Student'}</p>
-                                            <p className="text-xs md:text-sm text-slate-600 truncate">{app.student?.email}</p>
-                                            {app.student?.branch && <p className="text-xs text-slate-500 mt-0.5">{app.student.branch}</p>}
-                                            <div className="mt-2 bg-slate-50 p-2 rounded text-xs md:text-sm text-slate-700">{app.note || 'No cover note'}</div>
-                                        </div>
-                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                            {app.status === 'applied' ? (
-                                                <>
-                                                    <button
-                                                        onClick={() => handleUpdateApplicantStatus(selectedItem.recruitmentId, app._id, 'selected')}
-                                                        className="px-3 py-1.5 bg-green-500 text-white rounded-lg text-xs font-semibold hover:bg-green-600 transition-colors flex items-center gap-1"
-                                                        aria-label={`Accept ${app.student?.name}`}
-                                                    >
-                                                        <Check size={14} /> Accept
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleUpdateApplicantStatus(selectedItem.recruitmentId, app._id, 'rejected')}
-                                                        className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-xs font-semibold hover:bg-red-600 transition-colors flex items-center gap-1"
-                                                        aria-label={`Reject ${app.student?.name}`}
-                                                    >
-                                                        <X size={14} /> Reject
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <span className={`px-3 py-1.5 text-xs font-bold rounded-full ${app.status === 'selected' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                    {app.status === 'selected' ? '✓ Accepted' : '✗ Rejected'}
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                                {(!selectedItem.applicants || selectedItem.applicants.length === 0) && (
-                                    <p className="text-center text-slate-500 py-8">No applicants yet.</p>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Gallery Upload Modal */}
-            {
-                showGalleryUploadModal && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="gallery-upload-title">
-                        <div className="bg-white rounded-2xl w-full max-w-lg p-4 md:p-6 border border-slate-200 shadow-xl animate-fadeIn max-h-[90vh] overflow-y-auto">
-                            <h3 id="gallery-upload-title" className="text-lg md:text-xl font-bold mb-4">Upload Gallery Media</h3>
-                            <form onSubmit={handleGalleryUpload} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Select Event</label>
-                                    <select
-                                        required
-                                        value={galleryUploadEventId}
-                                        onChange={e => setGalleryUploadEventId(e.target.value)}
-                                        className="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none"
-                                    >
-                                        <option value="">Choose an option...</option>
-                                        <option value="unlinked" className="font-bold text-blue-600">General Gallery (Unlinked)</option>
-                                        <optgroup label="Link to Event">
-                                            {events.map(e => <option key={e._id} value={e._id}>{e.title}</option>)}
-                                        </optgroup>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-slate-700 mb-1">Media Files (max 10)</label>
-                                    <div className="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:border-blue-400 transition-colors cursor-pointer"
-                                        onClick={() => document.getElementById('gallery-file-input').click()}
-                                        onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-blue-400', 'bg-blue-50'); }}
-                                        onDragLeave={(e) => { e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50'); }}
-                                        onDrop={(e) => {
-                                            e.preventDefault();
-                                            e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
-                                            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/') || f.type.startsWith('video/'));
-                                            setGalleryUploadFiles(prev => [...prev, ...files].slice(0, 10));
-                                        }}
-                                    >
-                                        <Upload size={32} className="mx-auto text-slate-400 mb-2" />
-                                        <p className="text-sm text-slate-600">Click or drag media here</p>
-                                        <p className="text-xs text-slate-400 mt-1">Images/Videos up to 10MB each</p>
-                                    </div>
-                                    <input
-                                        id="gallery-file-input"
-                                        type="file"
-                                        multiple
-                                        accept="image/*,video/*"
-                                        className="hidden"
-                                        onChange={(e) => setGalleryUploadFiles(prev => [...prev, ...Array.from(e.target.files)].slice(0, 10))}
-                                    />
-                                    {galleryUploadFiles.length > 0 && (
-                                        <div className="mt-3 space-y-2">
-                                            <p className="text-xs text-slate-500 font-medium">{galleryUploadFiles.length} file(s) selected</p>
-                                            <div className="grid grid-cols-5 gap-2">
-                                                {galleryUploadFiles.map((file, i) => (
-                                                    <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100">
-                                                        {file.type.startsWith('video/') ? (
-                                                            <video src={URL.createObjectURL(file)} className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <img src={URL.createObjectURL(file)} alt={file.name} className="w-full h-full object-cover" />
-                                                        )}
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setGalleryUploadFiles(prev => prev.filter((_, idx) => idx !== i))}
-                                                            className="absolute top-0.5 right-0.5 p-0.5 bg-red-500 text-white rounded-full"
-                                                            aria-label={`Remove ${file.name}`}
-                                                        >
-                                                            <X size={12} />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="flex gap-3 mt-6">
-                                    <button type="button" onClick={() => { setShowGalleryUploadModal(false); setGalleryUploadFiles([]); }} className="flex-1 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50">Cancel</button>
-                                    <button type="submit" disabled={galleryUploading} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                                        {galleryUploading ? (
-                                            <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Uploading...</>
-                                        ) : 'Upload Media'}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Lightbox Modal */}
-            {
-                lightbox.open && lightbox.images.length > 0 && (
-                    <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center" onClick={() => setLightbox({ ...lightbox, open: false })}>
-                        <button
-                            onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, open: false }); }}
-                            className="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors z-10"
-                            aria-label="Close lightbox"
-                        >
-                            <X size={28} />
-                        </button>
-                        {lightbox.images.length > 1 && (
-                            <>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, index: (lightbox.index - 1 + lightbox.images.length) % lightbox.images.length }); }}
-                                    className="absolute left-4 text-white/80 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors z-10"
-                                    aria-label="Previous image"
-                                >
-                                    <ChevronLeft size={32} />
-                                </button>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); setLightbox({ ...lightbox, index: (lightbox.index + 1) % lightbox.images.length }); }}
-                                    className="absolute right-4 text-white/80 hover:text-white p-3 rounded-full hover:bg-white/10 transition-colors z-10"
-                                    aria-label="Next image"
-                                >
-                                    <ChevronRight size={32} />
-                                </button>
-                            </>
-                        )}
-                        {lightbox.images[lightbox.index]?.resource_type === 'video' ? (
-                            <video
-                                src={lightbox.images[lightbox.index]?.url}
-                                controls
-                                autoPlay
-                                className="max-w-[90vw] max-h-[85vh] rounded-lg shadow-2xl outline-none"
-                                onClick={(e) => e.stopPropagation()}
-                            />
-                        ) : (
-                            <img
-                                src={lightbox.images[lightbox.index]?.url}
-                                alt={`Gallery item ${lightbox.index + 1}`}
-                                className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
-                                onClick={(e) => e.stopPropagation()}
-                            />
-                        )}
-                        <div className="absolute bottom-6 text-white/60 text-sm">
-                            {lightbox.index + 1} / {lightbox.images.length}
-                        </div>
-                    </div>
-                )
-            }
-
-            {/* Attendees Modal */}
-            {
-                showAttendeesModal && selectedItem && (
-                    <AttendeesModal
-                        event={selectedItem}
-                        onClose={() => { setShowAttendeesModal(false); setSelectedItem(null); }}
-                        userRole={user.role}
-                        onDownloadPDF={handleDownloadPDF}
-                    />
-                )
-            }
-
-            <ProfileModal
-                open={showProfilePanel}
-                onClose={() => setShowProfilePanel(false)}
-                user={user}
-                onUserUpdate={(u) => {
-                    setUser(u);
-                    localStorage.setItem('user', JSON.stringify(u));
-                }}
-                onLogout={() => {
-                    localStorage.removeItem('token');
-                    localStorage.removeItem('user');
-                    window.location.replace('/login');
-                }}
-            />
+            <ProfileModal open={showProfilePanel} onClose={() => setShowProfilePanel(false)} user={user} onUserUpdate={(u) => { setUser(u); localStorage.setItem('user', JSON.stringify(u)); setShowProfilePanel(false); }} onLogout={handleLogout} />
 
             <style>{`
-                @keyframes fadeIn {
-                    from { opacity: 0; transform: translateY(-10px); }
-                    to { opacity: 1; transform: translateY(0); }
-                }
-                .animate-fadeIn {
-                    animation: fadeIn 0.2s ease-out;
-                }
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+                .animate-fadeIn { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
             `}</style>
-        </div >
+        </div>
     );
 };
-
-// Helper Components
-const StatsCard = ({ icon: Icon, label, count, color }) => (
-    <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-${color}-500`}>
-        <div className="flex justify-between items-start">
-            <div>
-                <p className="text-slate-500 text-sm font-medium">{label}</p>
-                <h3 className="text-2xl font-bold mt-1">{count}</h3>
-            </div>
-            <div className={`p-2 bg-${color}-50 text-${color}-600 rounded-lg`}>
-                <Icon size={20} />
-            </div>
-        </div>
-    </div>
-);
-
-const QuickActionCard = ({ title, icon: Icon, onClick }) => (
-    <button onClick={onClick} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all flex items-center gap-4 text-left">
-        <div className="bg-blue-50 p-3 rounded-xl text-blue-600">
-            <Icon size={24} />
-        </div>
-        <span className="font-semibold text-slate-700">{title}</span>
-    </button>
-);
-
-
 
 export default FacultyDashboard;

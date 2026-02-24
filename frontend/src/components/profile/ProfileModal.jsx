@@ -119,7 +119,7 @@ const ProfileModal = ({ open, onClose, user, onUserUpdate, onLogout }) => {
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/50 z-[60] backdrop-blur-sm flex items-center justify-center p-4"
+        className="fixed inset-0 bg-black/50 z-[150] backdrop-blur-sm flex items-center justify-center p-4"
         onClick={handleClose}
       >
         <div
@@ -343,7 +343,7 @@ const ProfileModal = ({ open, onClose, user, onUserUpdate, onLogout }) => {
       </div>
 
       {showLogoutConfirm && (
-        <div className="fixed inset-0 bg-black/50 z-[80] backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 z-[160] backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-xs rounded-3xl shadow-2xl overflow-hidden animate-fadeIn">
             <div className="p-6 text-center">
               <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">

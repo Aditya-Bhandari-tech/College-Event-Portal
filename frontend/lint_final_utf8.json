@@ -1,0 +1,33 @@
+﻿
+> frontend@0.0.0 lint
+> eslint . json
+
+node.exe : 
+At C:\Program Files\n
+odejs\npm.ps1:29 
+char:3
++   & $NODE_EXE 
+$NPM_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (:String   
+ ) [], RemoteExce    
+ption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+Oops! Something went 
+wrong! :(
+
+ESLint: 9.39.2
+
+No files matching 
+the pattern "json" 
+were found.
+Please check for 
+typing mistakes in 
+the pattern.
+

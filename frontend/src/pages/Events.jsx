@@ -33,7 +33,7 @@ const EMPTY_FORM = { title: '', description: '', date: '', venue: '', branch: 'A
 
 /* ─── Confirm Delete Dialog ─── */
 const DeleteConfirm = ({ item, onConfirm, onCancel, loading }) => (
-    <div className="fixed inset-0 bg-black/50 z-[80] backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/50 z-[110] backdrop-blur-sm flex items-center justify-center p-4">
         <div className="bg-white w-full max-w-xs rounded-3xl shadow-2xl p-6 text-center animate-fadeIn">
             <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Trash2 size={24} className="text-red-500" />
@@ -50,8 +50,8 @@ const DeleteConfirm = ({ item, onConfirm, onCancel, loading }) => (
     </div>
 );
 
-/* ─── Create / Edit Modal ─── */
-const EventModal = ({ event, onClose, onSaved, userRole }) => {
+/* ─── Create / Edit Card (Inline) ─── */
+const EventForm = ({ event, onCancel, onSaved, userRole }) => {
     const [form, setForm] = useState(
         event
             ? {
@@ -84,7 +84,7 @@ const EventModal = ({ event, onClose, onSaved, userRole }) => {
                 const res = await axiosInstance.post('/events', form);
                 onSaved(res.data.data, 'create');
             }
-            onClose();
+            onCancel();
         } catch (err) {
             setError(err.response?.data?.message || 'Something went wrong.');
         } finally {
@@ -93,104 +93,107 @@ const EventModal = ({ event, onClose, onSaved, userRole }) => {
     };
 
     return (
-        <div
-            className="fixed inset-0 bg-black/50 z-[70] backdrop-blur-sm flex items-start justify-center p-4 pt-16 overflow-y-auto"
-            onClick={onClose}
-        >
-            <div
-                className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden animate-fadeIn mb-8"
-                onClick={e => e.stopPropagation()}
-            >
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-blue-600 to-indigo-600">
-                    <h2 className="text-white font-bold text-lg">{event ? 'Edit Event' : 'Create Event'}</h2>
-                    <button onClick={onClose} className="text-white/70 hover:text-white hover:bg-white/10 p-1.5 rounded-xl transition-colors">
-                        <X size={18} />
-                    </button>
+        <div className="bg-white rounded-3xl shadow-xl overflow-hidden animate-fadeIn mb-8 border border-slate-200">
+            {/* Header - Profile Hero Style */}
+            <div className="relative bg-gradient-to-br from-blue-600 to-indigo-600 px-6 py-10 text-center">
+                <h2 className="text-white font-extrabold text-2xl">
+                    {event ? 'Edit Event' : 'New Event'}
+                </h2>
+                <p className="text-blue-100 text-sm mt-1 opacity-90">
+                    {event ? 'Refine the details of your upcoming event' : 'Organize and publish a new event for students'}
+                </p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="p-8 space-y-6">
+                {error && (
+                    <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-700 text-sm animate-shake">
+                        <AlertCircle size={18} className="flex-shrink-0" />
+                        <span>{error}</span>
+                    </div>
+                )}
+
+                <div className="space-y-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Event Title</label>
+                    <input
+                        name="title" value={form.title} onChange={handleChange}
+                        className="w-full px-5 py-4 border border-slate-200 bg-slate-50/50 rounded-2xl text-base focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all placeholder:text-slate-300"
+                        placeholder="e.g. Annual Technical Symposium 2024"
+                        required
+                    />
                 </div>
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    {error && (
-                        <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm">
-                            <AlertCircle size={15} className="flex-shrink-0" />
-                            <span>{error}</span>
-                        </div>
-                    )}
+                <div className="space-y-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Detailed Description</label>
+                    <textarea
+                        name="description" value={form.description} onChange={handleChange} rows={5}
+                        className="w-full px-5 py-4 border border-slate-200 bg-slate-50/50 rounded-2xl text-base focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all resize-none placeholder:text-slate-300"
+                        placeholder="What is this event about? Mention key highlights..."
+                        required
+                    />
+                </div>
 
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Title *</label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Date & Time</label>
                         <input
-                            name="title" value={form.title} onChange={handleChange}
-                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition"
-                            placeholder="Event title"
+                            type="datetime-local" name="date" value={form.date} onChange={handleChange}
+                            className="w-full px-5 py-4 border border-slate-200 bg-slate-50/50 rounded-2xl text-base focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all"
+                            required
                         />
                     </div>
-
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Description *</label>
-                        <textarea
-                            name="description" value={form.description} onChange={handleChange} rows={3}
-                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition resize-none"
-                            placeholder="Describe the event…"
+                    <div className="space-y-2">
+                        <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Location / Venue</label>
+                        <input
+                            name="venue" value={form.venue} onChange={handleChange}
+                            className="w-full px-5 py-4 border border-slate-200 bg-slate-50/50 rounded-2xl text-base focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all placeholder:text-slate-300"
+                            placeholder="e.g. Main Auditorium"
+                            required
                         />
                     </div>
+                </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Date & Time *</label>
-                            <input
-                                type="datetime-local" name="date" value={form.date} onChange={handleChange}
-                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition"
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Venue *</label>
-                            <input
-                                name="venue" value={form.venue} onChange={handleChange}
-                                className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition"
-                                placeholder="Hall / Room / Ground"
-                            />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className="block text-xs font-semibold text-slate-500 mb-1 uppercase tracking-wide">Branch</label>
+                <div className="space-y-2">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Target Audience (Branch)</label>
+                    <div className="relative">
                         <select
                             name="branch" value={form.branch} onChange={handleChange}
-                            className="w-full px-3 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 outline-none transition bg-white"
+                            className="w-full px-5 py-4 border border-slate-200 bg-slate-50/50 rounded-2xl text-base focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none transition-all appearance-none cursor-pointer"
                         >
                             {BRANCH_OPTIONS.map(opt => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
                             ))}
                         </select>
+                        <div className="absolute right-5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                            <Clock size={18} />
+                        </div>
                     </div>
+                </div>
 
-                    <div className="flex gap-3 pt-2">
-                        <Button type="button" variant="secondary" className="flex-1" onClick={onClose} disabled={loading}>
-                            Cancel
-                        </Button>
-                        <Button type="submit" variant="primary" className="flex-1" loading={loading} icon={event ? Edit2 : Plus}>
-                            {event ? 'Save Changes' : 'Create Event'}
-                        </Button>
-                    </div>
-                </form>
-            </div>
+                <div className="flex gap-4 pt-6">
+                    <button type="button" onClick={onCancel} className="flex-1 py-4 px-6 border border-slate-200 rounded-2xl text-slate-600 font-bold text-sm hover:bg-slate-50 transition-all uppercase tracking-widest" disabled={loading}>
+                        Cancel
+                    </button>
+                    <button type="submit" disabled={loading} className="flex-[2] py-4 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-blue-200 hover:shadow-blue-300 hover:-translate-y-1 transition-all uppercase tracking-widest">
+                        {loading ? 'Processing...' : (event ? 'Save Changes' : 'Publish Event')}
+                    </button>
+                </div>
+            </form>
         </div>
     );
 };
 
 /* ═══════════════════════════════════════════════
    Main Events Component
+   Converted to Tabbed Interface (No Overlays)
 ════════════════════════════════════════════════ */
 const Events = ({ userRole, user, onRegister }) => {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('all');  // default: all
+    const [filter, setFilter] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
+    const [tab, setTab] = useState('list'); // 'list' | 'create'
 
-    // Modal state
-    const [showModal, setShowModal] = useState(false);
+    // Form/Edit state
     const [editingEvent, setEditingEvent] = useState(null);
     const [deleteTarget, setDeleteTarget] = useState(null);
     const [deleteLoading, setDeleteLoading] = useState(false);
@@ -237,6 +240,8 @@ const Events = ({ userRole, user, onRegister }) => {
         } else {
             setEvents(prev => prev.map(e => e._id === savedEvent._id ? savedEvent : e));
         }
+        setTab('list');
+        setEditingEvent(null);
     };
 
     const handleDelete = async () => {
@@ -261,15 +266,21 @@ const Events = ({ userRole, user, onRegister }) => {
         return false;
     };
 
+    const handleEdit = (event) => {
+        setEditingEvent(event);
+        setTab('create');
+    };
+
+    const handleCancelForm = () => {
+        setTab('list');
+        setEditingEvent(null);
+    };
+
     const handleDownloadPDF = (event) => {
         const doc = new jsPDF();
-
-        // Add Title
         doc.setFontSize(20);
-        doc.setTextColor(59, 130, 246); // Blue-500
+        doc.setTextColor(59, 130, 246);
         doc.text("Registered Students List", 14, 22);
-
-        // Add Event Info
         doc.setFontSize(12);
         doc.setTextColor(100);
         doc.text(`Event: ${event.title}`, 14, 32);
@@ -277,7 +288,6 @@ const Events = ({ userRole, user, onRegister }) => {
         doc.text(`Venue: ${event.venue}`, 14, 44);
         doc.text(`Exported on: ${new Date().toLocaleDateString()}`, 14, 50);
 
-        // Add Table
         const tableColumn = ["#", "Name", "Branch", "Year", "Mobile", "Email"];
         const tableRows = (event.registrations || []).map((student, index) => [
             index + 1,
@@ -305,189 +315,170 @@ const Events = ({ userRole, user, onRegister }) => {
 
     return (
         <div className="animate-fadeIn">
-            {/* ── Header row ── */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-3">
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-800">Events</h2>
-
-                <div className="flex items-center gap-3 w-full sm:w-auto">
-                    {/* Filter tabs */}
-                    <div className="flex bg-slate-100 p-1 rounded-lg flex-1 sm:flex-initial" role="tablist">
-                        {['all', 'upcoming', 'past'].map(f => (
-                            <button
-                                key={f}
-                                onClick={() => setFilter(f)}
-                                className={`px-3 py-1.5 rounded-md text-sm font-medium capitalize transition-all flex-1 sm:flex-initial ${filter === f ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                                    }`}
-                                role="tab"
-                                aria-selected={filter === f}
-                            >
-                                {f}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Create button — faculty/admin only */}
-                    {canManage && (
-                        <Button
-                            icon={Plus}
-                            size="md"
-                            onClick={() => { setEditingEvent(null); setShowModal(true); }}
-                        >
-                            <span className="hidden sm:inline">Create Event</span>
-                        </Button>
-                    )}
+            {/* ── Header & Tab Switcher ── */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
+                <div>
+                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">Events</h2>
+                    <p className="text-slate-500 font-medium mt-1">Manage and discover campus activities</p>
                 </div>
-            </div>
 
-            {/* ── Search ── */}
-            <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200 mb-6 flex items-center gap-2 w-full sm:max-w-md">
-                <Search size={18} className="text-slate-400 flex-shrink-0" />
-                <input
-                    type="text"
-                    placeholder="Search events…"
-                    className="flex-1 outline-none text-slate-700 text-sm min-w-0"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                />
-                {searchTerm && (
-                    <button onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-slate-600">
-                        <X size={15} />
-                    </button>
-                )}
-            </div>
-
-            {/* ── Event cards ── */}
-            {loading ? <Loader /> : (
-                <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
-                    {filteredEvents.length > 0 ? filteredEvents.map(event => {
-                        const isUpcoming = new Date(event.date) >= new Date();
-                        const canEdit = canEditEvent(event);
-
-                        return (
-                            <article
-                                key={event._id}
-                                className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-md transition-all flex flex-col group"
+                <div className="flex flex-wrap items-center gap-4">
+                    {/* Tab Switcher (Faculty/Admin only) */}
+                    {canManage && (
+                        <div className="flex bg-white rounded-2xl p-1 shadow-md border border-slate-200">
+                            <button
+                                onClick={() => handleCancelForm()}
+                                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${tab === 'list' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-600 hover:bg-slate-50'}`}
                             >
-                                {/* Image */}
-                                <div className="relative h-40 sm:h-48 overflow-hidden">
-                                    <img
-                                        src={event.image || 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=600&h=400&fit=crop'}
-                                        alt={event.title}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                                    />
-                                    {/* Status badge */}
-                                    {(() => {
-                                        const eventDate = new Date(event.date);
-                                        const now = new Date();
-                                        const isToday = eventDate.toDateString() === now.toDateString();
-
-                                        if (isToday) {
-                                            return (
-                                                <span className="absolute top-3 left-3 px-2.5 py-1 text-xs font-bold rounded-full shadow bg-emerald-500 text-white flex items-center gap-1.5">
-                                                    <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                                                    Ongoing
-                                                </span>
-                                            );
-                                        }
-                                        if (eventDate > now) {
-                                            return (
-                                                <span className="absolute top-3 left-3 px-2.5 py-1 text-xs font-bold rounded-full shadow bg-blue-500 text-white">
-                                                    Upcoming
-                                                </span>
-                                            );
-                                        }
-                                        return (
-                                            <span className="absolute top-3 left-3 px-2.5 py-1 text-xs font-bold rounded-full shadow bg-slate-500 text-white">
-                                                Completed
-                                            </span>
-                                        );
-                                    })()}
-
-                                    {/* Edit/Delete buttons */}
-                                    {canEdit && (
-                                        <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button
-                                                onClick={() => { setEditingEvent(event); setShowModal(true); }}
-                                                className="bg-white/90 hover:bg-white text-blue-600 p-1.5 rounded-lg shadow-md transition-colors"
-                                                title="Edit event"
-                                            >
-                                                <Edit2 size={13} />
-                                            </button>
-                                            <button
-                                                onClick={() => setDeleteTarget(event)}
-                                                className="bg-white/90 hover:bg-white text-red-500 p-1.5 rounded-lg shadow-md transition-colors"
-                                                title="Delete event"
-                                            >
-                                                <Trash2 size={13} />
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Body */}
-                                <div className="p-4 sm:p-5 flex flex-col flex-1">
-                                    <h3 className="font-bold text-base text-slate-900 mb-1.5">{event.title}</h3>
-                                    <p className="text-slate-500 text-sm mb-4 line-clamp-2 flex-1">{event.description}</p>
-
-                                    <div className="space-y-1.5">
-                                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                                            <Calendar size={13} className="text-blue-500 flex-shrink-0" />
-                                            <span>{new Date(event.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                            <Clock size={13} className="text-amber-500 flex-shrink-0 ml-1" />
-                                            <span>{new Date(event.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                                            <MapPin size={13} className="text-red-500 flex-shrink-0" />
-                                            <span>{event.venue}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-xs text-slate-500">
-                                            <Users size={13} className="text-emerald-500 flex-shrink-0" />
-                                            <span>{getBranchLabel(event.branch)}</span>
-                                        </div>
-                                    </div>
-
-                                    {userRole?.toLowerCase() === 'student' && isUpcoming && (
-                                        <button
-                                            onClick={() => onRegister(event._id)}
-                                            disabled={event.registrations?.includes(user?._id)}
-                                            className={`mt-4 w-full py-2 rounded-xl font-semibold text-sm transition-colors ${event.registrations?.includes(user?._id)
-                                                ? 'bg-green-50 text-green-600 cursor-not-allowed'
-                                                : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                                                }`}
-                                        >
-                                            {event.registrations?.includes(user?._id) ? 'Registered' : 'Register'}
-                                        </button>
-                                    )}
-
-                                    {userRole !== 'student' && (
-                                        <button
-                                            onClick={() => { setSelectedItem(event); setShowAttendeesModal(true); }}
-                                            className="mt-4 w-full py-2 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-xl font-semibold text-sm transition-colors flex items-center justify-center gap-2"
-                                        >
-                                            <Users size={16} />
-                                            View Attendees ({event.registrations?.length || 0})
-                                        </button>
-                                    )}
-                                </div>
-                            </article>
-                        );
-                    }) : (
-                        <div className="col-span-full">
-                            <EmptyState message={`No ${filter === 'all' ? '' : filter + ' '}events found.`} />
+                                <Calendar size={18} /> View Feed
+                            </button>
+                            <button
+                                onClick={() => { setEditingEvent(null); setTab('create'); }}
+                                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${tab === 'create' ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : 'text-slate-600 hover:bg-slate-50'}`}
+                            >
+                                <Plus size={18} /> New Event
+                            </button>
                         </div>
                     )}
                 </div>
-            )}
+            </div>
 
-            {/* ── Modals ── */}
-            {showModal && (
-                <EventModal
+            {tab === 'create' ? (
+                <EventForm
                     event={editingEvent}
-                    onClose={() => { setShowModal(false); setEditingEvent(null); }}
+                    onCancel={handleCancelForm}
                     onSaved={handleSaved}
                     userRole={userRole}
                 />
+            ) : (
+                <>
+                    {/* ── Filter Bar & Search ── */}
+                    <div className="flex flex-col lg:flex-row gap-4 mb-8">
+                        {/* Status Filters */}
+                        <div className="flex bg-white p-1 rounded-2xl shadow-sm border border-slate-200 overflow-x-auto no-scrollbar">
+                            {['all', 'upcoming', 'past'].map(f => (
+                                <button
+                                    key={f}
+                                    onClick={() => setFilter(f)}
+                                    className={`px-6 py-2.5 rounded-xl text-sm font-bold capitalize transition-all whitespace-nowrap ${filter === f ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    {f} Events
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* Search Input */}
+                        <div className="flex-1 bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200 flex items-center gap-3 transition-all focus-within:shadow-md focus-within:border-blue-200">
+                            <Search size={20} className="text-slate-400 flex-shrink-0" />
+                            <input
+                                type="text"
+                                placeholder="Search by title, description or venue…"
+                                className="flex-1 outline-none text-slate-700 font-medium placeholder:text-slate-300"
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                            />
+                            {searchTerm && (
+                                <button onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-blue-600">
+                                    <X size={20} />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* ── Event Grid ── */}
+                    {loading ? <Loader /> : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {filteredEvents.length > 0 ? filteredEvents.map(event => {
+                                const isUpcoming = new Date(event.date) >= new Date();
+                                const canEdit = canEditEvent(event);
+
+                                return (
+                                    <article
+                                        key={event._id}
+                                        className="bg-white rounded-[2.5rem] overflow-hidden shadow-sm border border-slate-200 hover:shadow-2xl transition-all duration-500 flex flex-col group h-full"
+                                    >
+                                        {/* Image Section */}
+                                        <div className="relative h-56 overflow-hidden">
+                                            <img
+                                                src={event.image || 'https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=600&h=400&fit=crop'}
+                                                alt={event.title}
+                                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                            />
+
+                                            {/* Status Badge */}
+                                            <div className="absolute top-4 left-4">
+                                                {(() => {
+                                                    const eventDate = new Date(event.date);
+                                                    const now = new Date();
+                                                    const isToday = eventDate.toDateString() === now.toDateString();
+
+                                                    if (isToday) return <span className="px-3 py-1.5 bg-emerald-500 text-white text-[10px] font-black uppercase tracking-wider rounded-full shadow-lg flex items-center gap-1.5"><span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />Live Now</span>;
+                                                    if (eventDate > now) return <span className="px-3 py-1.5 bg-blue-600 text-white text-[10px] font-black uppercase tracking-wider rounded-full shadow-lg">Upcoming</span>;
+                                                    return <span className="px-3 py-1.5 bg-slate-800 text-white text-[10px] font-black uppercase tracking-wider rounded-full shadow-lg">Completed</span>;
+                                                })()}
+                                            </div>
+
+                                            {/* Action Buttons overlay */}
+                                            {canEdit && (
+                                                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 text-white">
+                                                    <button onClick={() => handleEdit(event)} className="bg-white/90 hover:bg-white text-blue-600 p-2.5 rounded-xl shadow-xl backdrop-blur-md transition-all hover:scale-110"><Edit2 size={16} /></button>
+                                                    <button onClick={() => setDeleteTarget(event)} className="bg-white/90 hover:bg-white text-red-500 p-2.5 rounded-xl shadow-xl backdrop-blur-md transition-all hover:scale-110"><Trash2 size={16} /></button>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Info Section */}
+                                        <div className="p-7 flex flex-col flex-1">
+                                            <h3 className="font-extrabold text-xl text-slate-900 mb-3 group-hover:text-blue-600 transition-colors line-clamp-1">{event.title}</h3>
+                                            <p className="text-slate-500 font-medium text-sm mb-6 line-clamp-3 leading-relaxed flex-1">{event.description}</p>
+
+                                            <div className="space-y-3.5 mb-6">
+                                                <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                                                    <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center"><Calendar size={14} /></div>
+                                                    <span>{new Date(event.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} • {new Date(event.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                                                    <div className="w-8 h-8 rounded-xl bg-red-50 text-red-600 flex items-center justify-center"><MapPin size={14} /></div>
+                                                    <span>{event.venue}</span>
+                                                </div>
+                                                <div className="flex items-center gap-3 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                                                    <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><Users size={14} /></div>
+                                                    <span>{getBranchLabel(event.branch)}</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Action Button */}
+                                            {userRole?.toLowerCase() === 'student' && isUpcoming ? (
+                                                <button
+                                                    onClick={() => onRegister(event._id)}
+                                                    disabled={event.registrations?.includes(user?._id)}
+                                                    className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${event.registrations?.includes(user?._id) ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-xl shadow-blue-100 hover:shadow-blue-200 hover:-translate-y-1'}`}
+                                                >
+                                                    {event.registrations?.includes(user?._id) ? 'Successfully Registered' : 'Register Now'}
+                                                </button>
+                                            ) : userRole !== 'student' && (
+                                                <button
+                                                    onClick={() => { setSelectedItem(event); setShowAttendeesModal(true); }}
+                                                    className="w-full py-4 bg-slate-100 text-slate-900 hover:bg-slate-900 hover:text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-3"
+                                                >
+                                                    <Users size={18} />
+                                                    Attendees ({event.registrations?.length || 0})
+                                                </button>
+                                            )}
+                                        </div>
+                                    </article>
+                                );
+                            }) : (
+                                <div className="col-span-full py-20">
+                                    <EmptyState message={`No ${filter === 'all' ? '' : filter + ' '}events found matching your search.`} />
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
             )}
+
+            {/* ── Light Dialogs ── */}
             {deleteTarget && (
                 <DeleteConfirm
                     item={deleteTarget}
