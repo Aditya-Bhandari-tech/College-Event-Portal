@@ -12,29 +12,35 @@ import Users from "./pages/Users";
 import AdminEventApprovals from "./pages/AdminEventApprovals";
 import { ThemeProvider } from "./contexts/ThemeContext";
 
+import ProtectedRoute from "./components/AuthComponents/ProtectedRoute";
+import PublicRoute from "./components/AuthComponents/PublicRoute";
+
 export default function App() {
   return (
     <ThemeProvider>
       <Routes>
-        <Route path="/" element={<Welcome />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/login" element={<Login />} />
+        {/* ── Public routes: only accessible when NOT logged in ── */}
+        <Route path="/" element={<PublicRoute><Welcome /></PublicRoute>} />
+        <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
 
-        {/* Admin & Student Dashboard (Role handled inside Dashboard.jsx) */}
-        <Route path="/admin" element={<Dashboard />} />
-        <Route path="/student" element={<Dashboard />} />
+        {/* ── Protected routes: only accessible when logged in ── */}
+
+        {/* Admin & Student Dashboard */}
+        <Route path="/admin" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+        <Route path="/student" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
         {/* Faculty Dashboard */}
-        <Route path="/faculty" element={<FacultyDashboard />} />
+        <Route path="/faculty" element={<ProtectedRoute><FacultyDashboard /></ProtectedRoute>} />
 
         {/* Student Pages */}
-        <Route path="/event-requests" element={<EventRequests />} />
-        <Route path="/recruitment" element={<Recruitment />} />
+        <Route path="/event-requests" element={<ProtectedRoute><EventRequests /></ProtectedRoute>} />
+        <Route path="/recruitment" element={<ProtectedRoute><Recruitment /></ProtectedRoute>} />
 
         {/* Admin Pages */}
-        <Route path="/admin/users" element={<Users />} />
-        <Route path="/admin/events" element={<AdminEventApprovals />} />
-        <Route path="/admin/settings" element={<Dashboard />} />
+        <Route path="/admin/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
+        <Route path="/admin/events" element={<ProtectedRoute><AdminEventApprovals /></ProtectedRoute>} />
+        <Route path="/admin/settings" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
         <Route path="*" element={<NotFound />} />
       </Routes>

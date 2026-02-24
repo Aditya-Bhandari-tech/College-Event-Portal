@@ -237,19 +237,17 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
+    // Load initial user from localStorage
     const storedUser = localStorage.getItem('user');
-    const token = localStorage.getItem('token');
-
-    if (!storedUser || !token) {
-      navigate('/login');
-      return;
+    if (storedUser) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        if (parsedUser.role === 'admin') fetchUsers();
+      } catch (_) { }
     }
 
-    // Set from localStorage immediately (fast render)
-    const parsedUser = JSON.parse(storedUser);
-    setUser(parsedUser);
-
-    // Then fetch fresh user from DB — ensures profilePic & all fields are up to date
+    // Fetch fresh user from server
     axiosInstance.get('/users/me')
       .then(res => {
         const freshUser = res.data?.data || res.data;
@@ -258,14 +256,9 @@ const Dashboard = () => {
           localStorage.setItem('user', JSON.stringify(freshUser));
         }
       })
-      .catch(() => {
-        // If /me fails, keep using cached localStorage user silently
-      });
-
-    if (parsedUser.role === 'admin') {
-      fetchUsers();
-    }
-  }, [navigate]);
+      .catch(() => { });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Load user-scoped read/cleared IDs from localStorage when user is known
   useEffect(() => {
@@ -558,13 +551,13 @@ const Dashboard = () => {
                   return (
                     <button
                       key={action.name}
-                      onClick={() => { 
+                      onClick={() => {
                         if (action.action) {
                           handleRouteChange(action.action);
                         } else {
                           navigate(action.path);
                         }
-                        setMobileSidebarOpen(false); 
+                        setMobileSidebarOpen(false);
                       }}
                       className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-slate-400 hover:bg-slate-800/50 hover:text-white ${sidebarCollapsed && !mobileSidebarOpen ? 'justify-center' : ''}`}
                     >
@@ -1144,7 +1137,7 @@ const Dashboard = () => {
         onLogout={() => {
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          navigate('/login');
+          window.location.replace('/login'); // full reload — reliable logout
         }}
       />
 
@@ -1305,8 +1298,8 @@ const Dashboard = () => {
 
 const StatsCard = ({ icon: Icon, label, count, iconBg, iconColor, onClick }) => {
   return (
-    <div 
-      className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-200 hover:shadow-md transition-all cursor-pointer group" 
+    <div
+      className="bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-slate-200 hover:shadow-md transition-all cursor-pointer group"
       role="status"
       onClick={onClick}
     >
@@ -2278,7 +2271,7 @@ const UserManagementView = ({ allUsers }) => {
           <h2 className="text-xl md:text-2xl font-bold text-slate-900">User Management</h2>
           <p className="text-sm text-slate-500 mt-0.5">{allUsers.length} total registered users</p>
         </div>
-        <button 
+        <button
           onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
           className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
         >

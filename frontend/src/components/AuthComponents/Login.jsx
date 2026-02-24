@@ -6,6 +6,7 @@ import axios from 'axios';
 import GoogleAuthButton from './GoogleAuthButton';
 import { jwtDecode } from 'jwt-decode';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useAuth } from '../../contexts/useAuth';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CSS KEYFRAMES  (injected once — zero JS overhead at runtime)
@@ -135,6 +136,7 @@ const FEATURES = [
 // ─────────────────────────────────────────────────────────────────────────────
 const Login = () => {
   const navigate = useNavigate();
+  const { login: authLogin, syncUser } = useAuth();
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -149,17 +151,17 @@ const Login = () => {
     e.preventDefault();
     try {
       setLoading(true); setError('');
-      const res = await axios.post('http://localhost:5000/api/auth/login', formData);
-      if (res.data.token) {
-        localStorage.setItem('token', res.data.token);
-        localStorage.setItem('user', JSON.stringify(res.data.user));
-        const role = res.data.user.role;
-        navigate(role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student');
-      } else if (res.data.needsApproval) {
-        setError('Your account is pending admin approval.');
-      }
+      // Use authLogin so the context user state is updated immediately
+      const data = await authLogin(formData.email, formData.password);
+      const role = data.user.role;
+      navigate(role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student', { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+      const msg = err.response?.data?.message || 'Login failed. Please check your credentials.';
+      if (msg.toLowerCase().includes('approval')) {
+        setError('Your account is pending admin approval.');
+      } else {
+        setError(msg);
+      }
     } finally { setLoading(false); }
   };
 
@@ -174,10 +176,12 @@ const Login = () => {
         googleId: decoded.sub,
       });
       if (res.data.token) {
+        // Update context state so ProtectedRoute sees auth immediately
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
+        syncUser(); // sync AuthContext in-memory state from localStorage
         const role = res.data.user.role;
-        navigate(role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student');
+        navigate(role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student', { replace: true });
       } else if (res.data.needsProfile) {
         setError('No account found for this email. Please sign up first.');
       }

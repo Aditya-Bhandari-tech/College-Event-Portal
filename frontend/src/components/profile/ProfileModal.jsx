@@ -108,9 +108,8 @@ const ProfileModal = ({ open, onClose, user, onUserUpdate, onLogout }) => {
   };
 
   const handleLogoutConfirm = () => {
-    setShowLogoutConfirm(false);
-    handleClose();
-    onLogout();
+    onLogout(); // trigger logout first (page reload via window.location.replace)
+    setShowLogoutConfirm(false); // cleanup (won't matter if page reloads, but good practice)
   };
 
   const roleLabel = role === 'admin' ? 'Administration' : role ? role.charAt(0).toUpperCase() + role.slice(1) : '';
