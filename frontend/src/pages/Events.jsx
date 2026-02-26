@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axiosInstance from '../api/axios';
-import { Calendar, MapPin, Search, Clock, Users, Plus, Edit2, Trash2, X, AlertCircle, FileText, CheckCircle } from 'lucide-react';
+import { Calendar, MapPin, Search, Clock, Users, Plus, Edit2, Trash2, X, AlertCircle, FileText, CheckCircle, Share2 } from 'lucide-react';
 import Loader from '../components/common/Loader';
 import EmptyState from '../components/common/EmptyState';
 import Button from '../components/common/Button';
@@ -9,6 +9,7 @@ import autoTable from 'jspdf-autotable';
 import AttendeesModal from '../components/specific/AttendeesModal';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import SuccessModal from '../components/common/SuccessModal';
+import { generateNoticePDF } from '../utils/NoticeGenerator';
 
 // Full branch name mapping
 const BRANCH_LABELS = {
@@ -191,7 +192,10 @@ const Events = ({ userRole, user, onRegister, onShowStatus, initialSearch = '' }
     const [showAttendeesModal, setShowAttendeesModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
     const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+    const [showShareSuccess, setShowShareSuccess] = useState(false);
+    const [showNoticeModal, setShowNoticeModal] = useState(false);
     const [lastDeletedTitle, setLastDeletedTitle] = useState('');
+    const [newlyCreatedEvent, setNewlyCreatedEvent] = useState(null);
 
     const canManage = userRole === 'admin' || userRole === 'faculty';
 
@@ -226,10 +230,39 @@ const Events = ({ userRole, user, onRegister, onShowStatus, initialSearch = '' }
         return filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
     };
 
+    const handleShare = async (event) => {
+        const shareData = {
+            title: event.title,
+            text: `Check out this event: ${event.title}\nVenue: ${event.venue}\nDate: ${new Date(event.date).toLocaleDateString()}`,
+            url: window.location.origin + '/student?event=' + event._id
+        };
+
+        if (navigator.share) {
+            try {
+                await navigator.share(shareData);
+            } catch (err) {
+                console.error('Share failed', err);
+            }
+        } else {
+            // Fallback: Copy to clipboard
+            try {
+                await navigator.clipboard.writeText(shareData.url);
+                setShowShareSuccess(true);
+            } catch (err) {
+                console.error('Clipboard failed', err);
+            }
+        }
+    };
+
     /* ── CRUD handlers ── */
     const handleSaved = (savedEvent, mode) => {
         if (mode === 'create') {
             setEvents(prev => [savedEvent, ...prev]);
+            // Show professional download message card for faculty instead of auto-download
+            if (userRole === 'faculty' || userRole === 'admin') {
+                setNewlyCreatedEvent(savedEvent);
+                setShowNoticeModal(true);
+            }
         } else {
             setEvents(prev => prev.map(e => e._id === savedEvent._id ? savedEvent : e));
         }
@@ -418,12 +451,16 @@ const Events = ({ userRole, user, onRegister, onShowStatus, initialSearch = '' }
                                             </div>
 
                                             {/* Action Buttons overlay */}
-                                            {canEdit && (
-                                                <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 text-white">
-                                                    <button onClick={() => handleEdit(event)} className="bg-white/90 hover:bg-white text-blue-600 p-2.5 rounded-xl shadow-xl backdrop-blur-md transition-all hover:scale-110"><Edit2 size={16} /></button>
-                                                    <button onClick={() => setDeleteTarget(event)} className="bg-white/90 hover:bg-white text-red-500 p-2.5 rounded-xl shadow-xl backdrop-blur-md transition-all hover:scale-110"><Trash2 size={16} /></button>
-                                                </div>
-                                            )}
+                                            <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300 translate-y-2 group-hover:translate-y-0 text-white">
+                                                <button onClick={() => handleShare(event)} title="Share Event" className="bg-white/90 hover:bg-white text-indigo-600 p-2.5 rounded-xl shadow-xl backdrop-blur-md transition-all hover:scale-110"><Share2 size={16} /></button>
+                                                {canEdit && (
+                                                    <>
+                                                        <button onClick={() => generateNoticePDF(event, user)} title="Download Notice" className="bg-white/90 hover:bg-white text-indigo-600 p-2.5 rounded-xl shadow-xl backdrop-blur-md transition-all hover:scale-110"><FileText size={16} /></button>
+                                                        <button onClick={() => handleEdit(event)} title="Edit Event" className="bg-white/90 hover:bg-white text-blue-600 p-2.5 rounded-xl shadow-xl backdrop-blur-md transition-all hover:scale-110"><Edit2 size={16} /></button>
+                                                        <button onClick={() => setDeleteTarget(event)} title="Delete Event" className="bg-white/90 hover:bg-white text-red-500 p-2.5 rounded-xl shadow-xl backdrop-blur-md transition-all hover:scale-110"><Trash2 size={16} /></button>
+                                                    </>
+                                                )}
+                                            </div>
                                         </div>
 
                                         {/* Info Section */}
@@ -448,23 +485,41 @@ const Events = ({ userRole, user, onRegister, onShowStatus, initialSearch = '' }
 
                                             {/* Action Button */}
                                             {userRole?.toLowerCase() === 'student' && isUpcoming ? (
-                                                <button
-                                                    onClick={() => isRegistered ? onShowStatus(event) : onRegister(event._id)}
-                                                    className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${isRegistered ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-xl shadow-blue-100 hover:shadow-blue-200 hover:-translate-y-1'}`}
-                                                >
-                                                    <div className="flex items-center justify-center gap-2">
-                                                        {isRegistered && <CheckCircle size={16} />}
-                                                        {isRegistered ? 'Registered' : 'Register Now'}
-                                                    </div>
-                                                </button>
+                                                <div className="flex flex-col gap-3">
+                                                    <button
+                                                        onClick={() => isRegistered ? onShowStatus(event) : onRegister(event._id)}
+                                                        className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${isRegistered ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-xl shadow-blue-100 hover:shadow-blue-200 hover:-translate-y-1'}`}
+                                                    >
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            {isRegistered && <CheckCircle size={16} />}
+                                                            {isRegistered ? 'Registered' : 'Register Now'}
+                                                        </div>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleShare(event)}
+                                                        className="w-full py-4 bg-slate-50 text-slate-600 hover:bg-slate-100 rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-3 border border-slate-100"
+                                                    >
+                                                        <Share2 size={18} /> Share Event
+                                                    </button>
+                                                </div>
                                             ) : userRole !== 'student' && (
-                                                <button
-                                                    onClick={() => { setSelectedItem(event); setShowAttendeesModal(true); }}
-                                                    className="w-full py-4 bg-slate-100 text-slate-900 hover:bg-slate-900 hover:text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-3"
-                                                >
-                                                    <Users size={18} />
-                                                    Attendees ({event.registrations?.length || 0})
-                                                </button>
+                                                <div className="flex flex-col gap-3">
+                                                    <button
+                                                        onClick={() => { setSelectedItem(event); setShowAttendeesModal(true); }}
+                                                        className="w-full py-4 bg-slate-100 text-slate-900 hover:bg-slate-900 hover:text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-3"
+                                                    >
+                                                        <Users size={18} />
+                                                        Attendees ({event.registrations?.length || 0})
+                                                    </button>
+
+                                                    <button
+                                                        onClick={() => generateNoticePDF(event, user)}
+                                                        className="w-full py-4 bg-indigo-50 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-2xl font-black text-sm uppercase tracking-widest transition-all flex items-center justify-center gap-3 border border-indigo-100"
+                                                    >
+                                                        <FileText size={18} />
+                                                        Download Notice
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                     </article>
@@ -502,6 +557,33 @@ const Events = ({ userRole, user, onRegister, onShowStatus, initialSearch = '' }
                     message={`"${lastDeletedTitle}" has been successfully removed from the system.`}
                     hideActions={true}
                     autoCloseMs={1500}
+                />
+            )}
+
+            {showShareSuccess && (
+                <SuccessModal
+                    open={showShareSuccess}
+                    onClose={() => setShowShareSuccess(false)}
+                    title="Link Copied"
+                    message="Event link has been copied to your clipboard. Send it to your friends!"
+                    hideActions={true}
+                    autoCloseMs={2000}
+                />
+            )}
+
+            {showNoticeModal && (
+                <SuccessModal
+                    open={showNoticeModal}
+                    onClose={() => { setShowNoticeModal(false); setNewlyCreatedEvent(null); }}
+                    title="Event Published!"
+                    message="Your professional notice is ready for download."
+                    eventDetails={newlyCreatedEvent}
+                    confirmLabel="Download Notice"
+                    onConfirm={() => {
+                        generateNoticePDF(newlyCreatedEvent, user);
+                        setShowNoticeModal(false);
+                        setNewlyCreatedEvent(null);
+                    }}
                 />
             )}
 

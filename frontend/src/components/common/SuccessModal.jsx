@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { CheckCircle, X, ExternalLink, Calendar, MapPin } from 'lucide-react';
+import { CheckCircle, X, ExternalLink, Calendar, MapPin, FileText } from 'lucide-react';
 
 /**
  * SuccessModal – A premium, standard success message card.
@@ -12,6 +12,8 @@ const SuccessModal = ({
     message,
     eventDetails = null,
     onViewRegistrations,
+    onConfirm,
+    confirmLabel,
     autoCloseMs = null,
     hideActions = false,
 }) => {
@@ -98,10 +100,11 @@ const SuccessModal = ({
                     {!hideActions && (
                         <div className="space-y-3">
                             <button
-                                onClick={onViewRegistrations}
+                                onClick={onConfirm || onViewRegistrations}
                                 className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-slate-200 hover:shadow-slate-300 hover:bg-black transition-all flex items-center justify-center gap-2"
                             >
-                                My Activity <ExternalLink size={16} />
+                                {confirmLabel || "My Activity"}
+                                {confirmLabel ? <FileText size={16} /> : <ExternalLink size={16} />}
                             </button>
                             <button
                                 onClick={onClose}
