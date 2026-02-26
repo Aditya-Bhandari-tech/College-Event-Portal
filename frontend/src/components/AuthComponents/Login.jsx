@@ -4,7 +4,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, CalendarCheck, Users, Zap, ArrowLeft } from 'lucide-react';
 import axiosInstance from '../../api/axios';
 import GoogleAuthButton from './GoogleAuthButton';
-import { jwtDecode } from 'jwt-decode';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../contexts/useAuth';
 
@@ -218,21 +217,20 @@ const Login = () => {
     } finally { setLoading(false); }
   };
 
-  const handleGoogleSuccess = async (credentialResponse) => {
+  const handleGoogleSuccess = async (response) => {
     try {
       setLoading(true); setError(''); setSuccessMessage('');
-      const decoded = jwtDecode(credentialResponse.credential);
+      const { profile, accessToken } = response;
 
       // First check if user exists
-      const check = await axiosInstance.post('/auth/google/check', { email: decoded.email });
+      const check = await axiosInstance.post('/auth/google/check', { email: profile.email });
 
       if (check.data.exists) {
-        // ... existing handleGoogleSuccess logic ...
         const res = await axiosInstance.post('/auth/google', {
-          credential: credentialResponse.credential,
-          email: decoded.email,
-          name: decoded.name,
-          googleId: decoded.sub,
+          accessToken: accessToken,
+          email: profile.email,
+          name: profile.name,
+          googleId: profile.sub,
         });
         if (res.data.token) {
           localStorage.setItem('token', res.data.token);
@@ -244,8 +242,8 @@ const Login = () => {
       } else {
         // New user — DO NOT show role selection modal on Login page
         setUserNotFoundData({
-          email: decoded.email,
-          name: decoded.name,
+          email: profile.email,
+          name: profile.name,
         });
       }
     } catch (err) {

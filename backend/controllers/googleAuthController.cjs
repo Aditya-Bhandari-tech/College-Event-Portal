@@ -5,17 +5,40 @@ const { OAuth2Client } = require('google-auth-library');
 
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
-// Verify Google Token
-const verifyGoogleToken = async (credential) => {
-  try {
-    const ticket = await client.verifyIdToken({
-      idToken: credential,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-    return ticket.getPayload();
-  } catch (error) {
-    throw new Error('Invalid Google token');
+// Verify Google Token (Supports both ID Token and Access Token)
+const verifyGoogleToken = async (credential, accessToken) => {
+  if (credential) {
+    try {
+      const ticket = await client.verifyIdToken({
+        idToken: credential,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      return ticket.getPayload();
+    } catch (error) {
+      throw new Error('Invalid Google ID token');
+    }
+  } else if (accessToken) {
+    try {
+      // Use the Google API to verify the access token and get user info
+      // This is necessary because useGoogleLogin (implicit flow) returns an access_token
+      const response = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${accessToken}`);
+      const data = await response.json();
+
+      if (data.error) throw new Error(data.error_description || 'Invalid access token');
+
+      return {
+        sub: data.sub,
+        email: data.email,
+        name: data.name,
+        picture: data.picture,
+        email_verified: data.email_verified
+      };
+    } catch (error) {
+      console.error('AccessToken verification error:', error);
+      throw new Error('Failed to verify Google access token');
+    }
   }
+  throw new Error('No Google token provided');
 };
 
 // Check if user exists
@@ -37,10 +60,10 @@ exports.checkGoogleUser = async (req, res) => {
 // Google Authentication (Login/Signup)
 exports.googleAuth = async (req, res) => {
   try {
-    const { credential, email, name, googleId, role, branch, phone, year, isGoogleAuth } = req.body;
+    const { credential, accessToken, email, name, googleId, role, branch, phone, year, isGoogleAuth } = req.body;
 
-    // Verify the Google token
-    const googleUser = await verifyGoogleToken(credential);
+    // Verify the Google token (either credential or accessToken)
+    const googleUser = await verifyGoogleToken(credential, accessToken);
 
     if (googleUser.email !== email) {
       return res.status(400).json({ message: 'Email mismatch' });
