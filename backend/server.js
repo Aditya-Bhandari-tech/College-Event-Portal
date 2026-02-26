@@ -14,6 +14,7 @@ import errorHandler from "./middleware/errorHandler.js";
 import eventRequestRoutes from "./routes/eventRequestRoutes.js";
 import googleAuthRoutes from "./routes/googleAuth.js";
 import galleryRoutes from "./routes/galleryRoutes.js";
+import healthRoutes from "./routes/healthRoutes.js";
 
 // __dirname for ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -38,6 +39,7 @@ app.use("/api/announcements", announcementRoutes);
 app.use("/api/recruitments", recruitmentRoutes);
 app.use("/api/event-requests", eventRequestRoutes);
 app.use("/api/gallery", galleryRoutes);
+app.use("/api/health", healthRoutes);
 
 
 //  Global error handler MUST be after routes
