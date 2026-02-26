@@ -4,7 +4,6 @@ import { useNavigate, Link } from "react-router-dom";
 import axiosInstance from "../../api/axios";
 import GoogleAuthButton from './GoogleAuthButton';
 import RoleSelectionModal from './RoleSelectionModal';
-import { jwtDecode } from 'jwt-decode';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, Users, CalendarCheck, ArrowLeft, XCircle, LogIn, MailWarning } from 'lucide-react';
 import { useAuth } from '../../contexts/useAuth';
@@ -195,15 +194,20 @@ const Signup = () => {
   const [googleUserData, setGoogleUserData] = useState(null);
   const [emailExistsData, setEmailExistsData] = useState(null);
 
-  const handleGoogleSuccess = async (credentialResponse) => {
+  const handleGoogleSuccess = async (response) => {
     try {
       setLoading(true); setError('');
-      const decoded = jwtDecode(credentialResponse.credential);
-      const check = await axiosInstance.post('/auth/google/check', { email: decoded.email });
+      const { profile, accessToken } = response;
+      const check = await axiosInstance.post('/auth/google/check', { email: profile.email });
       if (check.data.exists) {
-        setEmailExistsData({ email: decoded.email, name: decoded.name });
+        setEmailExistsData({ email: profile.email, name: profile.name });
       } else {
-        setGoogleUserData({ credential: credentialResponse.credential, email: decoded.email, name: decoded.name, googleId: decoded.sub });
+        setGoogleUserData({
+          accessToken: accessToken,
+          email: profile.email,
+          name: profile.name,
+          googleId: profile.sub
+        });
         setShowRoleModal(true);
       }
     } catch (err) {
