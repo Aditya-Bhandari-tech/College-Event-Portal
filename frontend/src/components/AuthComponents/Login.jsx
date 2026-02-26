@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff, Lock, Mail, CalendarCheck, Users, Zap, ArrowLeft } from 'lucide-react';
-import axios from 'axios';
+import axiosInstance from '../../api/axios';
 import GoogleAuthButton from './GoogleAuthButton';
 import { jwtDecode } from 'jwt-decode';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -132,6 +132,56 @@ const FEATURES = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// USER NOT FOUND OVERLAY
+// ─────────────────────────────────────────────────────────────────────────────
+function UserNotFoundOverlay({ email, name, onClose, onGoSignup }) {
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-[99990] flex items-center justify-center p-4"
+        style={{ background: 'rgba(4,4,12,0.88)', backdropFilter: 'blur(14px)' }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9, y: 24 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.9, y: 24 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 22 }}
+          className="relative bg-white/[0.04] border border-white/10 backdrop-blur-xl rounded-3xl p-8 max-w-md w-full text-center shadow-2xl"
+        >
+          {/* Top highlight */}
+          <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent rounded-t-3xl" />
+
+          <div className="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mx-auto mb-5">
+            <Mail className="w-8 h-8 text-indigo-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-2">Account Not Found</h2>
+          <p className="text-slate-400 text-sm mb-1">
+            Hi <span className="text-white font-medium">{name}</span>, it looks like
+          </p>
+          <p className="text-indigo-400 text-sm font-medium mb-3">{email}</p>
+          <p className="text-slate-500 text-sm mb-7">is not registered with us yet. Please create an account first to continue.</p>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={onGoSignup}
+              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold flex items-center justify-center gap-2 transition-all duration-200 hover:shadow-lg hover:shadow-indigo-500/25"
+            >
+              Go to Signup page
+            </button>
+            <button
+              onClick={onClose}
+              className="w-full py-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white text-sm font-medium flex items-center justify-center gap-2 transition-all duration-200"
+            >
+              Use a different account
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────────────────────────────────────
 const Login = () => {
@@ -141,6 +191,9 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [userNotFoundData, setUserNotFoundData] = useState(null);
+  const [googleUserData, setGoogleUserData] = useState(null);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -167,33 +220,59 @@ const Login = () => {
 
   const handleGoogleSuccess = async (credentialResponse) => {
     try {
-      setLoading(true); setError('');
+      setLoading(true); setError(''); setSuccessMessage('');
       const decoded = jwtDecode(credentialResponse.credential);
-      const res = await axios.post('http://localhost:5000/api/auth/google', {
-        credential: credentialResponse.credential,
-        email: decoded.email,
-        name: decoded.name,
-        googleId: decoded.sub,
-      });
-      if (res.data.token) {
-        // Update context state so ProtectedRoute sees auth immediately
-        localStorage.setItem('token', res.data.token);
-        localStorage.setItem('user', JSON.stringify(res.data.user));
-        syncUser(); // sync AuthContext in-memory state from localStorage
-        const role = res.data.user.role;
-        navigate(role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student', { replace: true });
-      } else if (res.data.needsProfile) {
-        setError('No account found for this email. Please sign up first.');
+
+      // First check if user exists
+      const check = await axiosInstance.post('/auth/google/check', { email: decoded.email });
+
+      if (check.data.exists) {
+        // ... existing handleGoogleSuccess logic ...
+        const res = await axiosInstance.post('/auth/google', {
+          credential: credentialResponse.credential,
+          email: decoded.email,
+          name: decoded.name,
+          googleId: decoded.sub,
+        });
+        if (res.data.token) {
+          localStorage.setItem('token', res.data.token);
+          localStorage.setItem('user', JSON.stringify(res.data.user));
+          syncUser();
+          const role = res.data.user.role;
+          navigate(role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student', { replace: true });
+        }
+      } else {
+        // New user — DO NOT show role selection modal on Login page
+        setUserNotFoundData({
+          email: decoded.email,
+          name: decoded.name,
+        });
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Google authentication failed');
+      const msg = err.response?.data?.message || 'Google authentication failed';
+      if (msg.toLowerCase().includes('approval') || msg.toLowerCase().includes('pending')) {
+        setError('⏳ Your account is pending admin approval. Please wait.');
+      } else {
+        setError(msg);
+      }
     } finally { setLoading(false); }
   };
+
 
   const handleGoogleError = () => setError('Google authentication failed. Please try again.');
 
   return (
     <div className="relative min-h-screen flex overflow-hidden bg-[#06060c]">
+
+      {/* User Not Found overlay for new Google users */}
+      {userNotFoundData && (
+        <UserNotFoundOverlay
+          email={userNotFoundData.email}
+          name={userNotFoundData.name}
+          onClose={() => setUserNotFoundData(null)}
+          onGoSignup={() => navigate('/signup')}
+        />
+      )}
 
       {/* ── Background ─────────────────────────────────────────────────── */}
       <StarField />
@@ -278,18 +357,27 @@ const Login = () => {
             {/* ── CTA / Form section ─────────────────────────────────────── */}
             <div className="px-8 py-8 relative z-10">
 
-              {/* Error banner */}
+              {/* Error / Success banners */}
               <AnimatePresence>
                 {error && (
                   <motion.div
                     initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-                    className={`px-4 py-3 rounded-2xl text-sm mb-5 border ${error.includes('approval')
+                    className={`px-4 py-3 rounded-2xl text-sm mb-5 border ${error.toLowerCase().includes('approval') || error.toLowerCase().includes('pending')
                       ? 'bg-amber-500/10 border-amber-500/25 text-amber-400'
                       : 'bg-red-500/10 border-red-500/25 text-red-400'
                       }`}
                     role="alert"
                   >
                     {error}
+                  </motion.div>
+                )}
+                {successMessage && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+                    className="px-4 py-3 rounded-2xl text-sm mb-5 border bg-green-500/10 border-green-500/25 text-green-400"
+                    role="status"
+                  >
+                    {successMessage}
                   </motion.div>
                 )}
               </AnimatePresence>

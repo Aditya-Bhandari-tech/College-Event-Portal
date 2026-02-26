@@ -42,95 +42,117 @@ const ConfirmDialog = ({
       iconBg: 'bg-red-100',
       iconColor: 'text-red-500',
       btnClass: 'bg-red-600 hover:bg-red-700 focus:ring-red-500 shadow-red-200',
+      gradient: 'from-red-500 to-rose-600',
     },
     success: {
       Icon: CheckCircle,
       iconBg: 'bg-emerald-100',
       iconColor: 'text-emerald-500',
       btnClass: 'bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500 shadow-emerald-200',
+      gradient: 'from-emerald-500 to-teal-600',
     },
     info: {
       Icon: Info,
       iconBg: 'bg-blue-100',
       iconColor: 'text-blue-500',
       btnClass: 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500 shadow-blue-200',
+      gradient: 'from-blue-500 to-indigo-600',
     },
   };
 
-  const { Icon, iconBg, iconColor, btnClass } = configs[variant] || configs.danger;
+  const { Icon, iconBg, iconColor, btnClass, gradient } = configs[variant] || configs.danger;
 
   return (
     <div
-      className="fixed inset-0 z-[300] flex items-center justify-center p-4"
+      className="fixed inset-0 z-[400] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="cdlg-title"
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-slate-900/60 backdrop-blur-md animate-fadeIn"
         onClick={() => !loading && onCancel?.()}
       />
 
-      {/* Panel */}
+      {/* Card */}
       <div
-        className="relative bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden"
-        style={{ animation: 'cdlgSlide 0.2s cubic-bezier(.22,.61,.36,1)' }}
+        className="relative bg-white rounded-[2.5rem] shadow-2xl w-full max-w-sm overflow-hidden animate-cdlgSlide"
       >
-        {/* Close × */}
-        <button
-          onClick={() => !loading && onCancel?.()}
-          disabled={loading}
-          className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
-          aria-label="Close"
-        >
-          <X size={16} />
-        </button>
+        {/* Top Pattern Decor */}
+        <div className={`absolute top-0 inset-x-0 h-32 bg-gradient-to-br ${gradient} opacity-10`} />
 
-        <div className="p-6 pb-0">
-          {/* Icon badge */}
-          <div className={`w-14 h-14 ${iconBg} rounded-2xl flex items-center justify-center mb-4 mx-auto`}>
-            <Icon size={26} className={iconColor} />
-          </div>
-
-          <h3 id="cdlg-title" className="text-lg font-bold text-slate-900 text-center mb-2">
-            {title}
-          </h3>
-          {message && (
-            <p className="text-sm text-slate-500 text-center leading-relaxed px-2">
-              {message}
-            </p>
-          )}
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex gap-3 p-6">
+        <div className="relative p-8">
+          {/* Close × */}
           <button
             onClick={() => !loading && onCancel?.()}
             disabled={loading}
-            className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-700 rounded-xl font-semibold text-sm hover:bg-slate-50 transition-colors disabled:opacity-50"
+            className="absolute top-6 right-6 p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-all"
+            aria-label="Close"
           >
-            {cancelLabel}
+            <X size={20} />
           </button>
-          <button
-            onClick={() => !loading && onConfirm?.()}
-            disabled={loading}
-            className={`flex-1 px-4 py-2.5 text-white rounded-xl font-semibold text-sm focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-lg disabled:opacity-60 flex items-center justify-center gap-2 transition-all ${btnClass}`}
-          >
-            {loading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Processing…
-              </>
-            ) : confirmLabel}
-          </button>
+
+          {/* Icon */}
+          <div className="flex justify-center mb-6">
+            <div className={`relative w-20 h-20 ${iconBg} rounded-3xl flex items-center justify-center animate-bounceIn`}>
+              <Icon size={32} className={iconColor} />
+              <div className={`absolute inset-0 rounded-3xl border-4 ${iconColor.replace('text', 'border')}/20 animate-ping`} />
+            </div>
+          </div>
+
+          <div className="text-center mb-8">
+            <h3 id="cdlg-title" className="text-2xl font-black text-slate-900 mb-2">
+              {title}
+            </h3>
+            {message && (
+              <p className="text-slate-500 font-medium leading-relaxed">
+                {message}
+              </p>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="space-y-3">
+            <button
+              onClick={() => !loading && onConfirm?.()}
+              disabled={loading}
+              className={`w-full py-4 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-2 ${btnClass}`}
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Processing…
+                </>
+              ) : confirmLabel}
+            </button>
+            <button
+              onClick={() => !loading && onCancel?.()}
+              disabled={loading}
+              className="w-full py-4 bg-transparent text-slate-400 font-bold text-sm uppercase tracking-widest hover:text-slate-600 transition-colors disabled:opacity-50"
+            >
+              {cancelLabel}
+            </button>
+          </div>
         </div>
       </div>
 
       <style>{`
         @keyframes cdlgSlide {
-          from { opacity: 0; transform: scale(0.9) translateY(16px); }
+          from { opacity: 0; transform: scale(0.95) translateY(20px); }
           to   { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        @keyframes bounceIn {
+          0% { transform: scale(0.3); opacity: 0; }
+          50% { transform: scale(1.05); opacity: 1; }
+          70% { transform: scale(0.9); }
+          100% { transform: scale(1); }
+        }
+        .animate-cdlgSlide {
+          animation: cdlgSlide 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .animate-bounceIn {
+          animation: bounceIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
         }
       `}</style>
     </div>

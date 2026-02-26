@@ -6,7 +6,7 @@ import {
   Camera, Edit2, Eye, EyeOff, Save, AlertCircle, CheckCircle,
   CheckCheck, BriefcaseBusiness, Sun, Moon, ToggleLeft, ToggleRight,
   Shield, Globe, Building2, Mail, BookOpen, Megaphone, Star,
-  Briefcase, Plus, ChevronDown, UserCheck, FileCheck
+  Briefcase, Plus, ChevronDown, UserCheck, FileCheck, Tag
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axios';
@@ -20,6 +20,7 @@ import DarkModeToggle from '../components/common/DarkModeToggle';
 import ConfirmDialog from '../components/common/ConfirmDialog';
 import RecruitmentCard from '../components/specific/RecruitmentCard';
 import GalleryMediaGrid from '../components/specific/GalleryMediaGrid';
+import SuccessModal from '../components/common/SuccessModal';
 
 // Branch options with full names (used across components)
 const BRANCHES = [
@@ -44,6 +45,7 @@ const Dashboard = () => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [activeRoute, setActiveRoute] = useState('Dashboard');
   const [searchQuery, setSearchQuery] = useState('');
+  const [eventSearch, setEventSearch] = useState('');
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   const [showProfilePanel, setShowProfilePanel] = useState(false);
@@ -53,6 +55,13 @@ const Dashboard = () => {
   const [allUsers, setAllUsers] = useState([]);
   const [pendingFaculty, setPendingFaculty] = useState([]);
   const [pendingEventRequests, setPendingEventRequests] = useState([]);
+
+  // Success Modal State
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successEvent, setSuccessEvent] = useState(null);
+  const [successVariant, setSuccessVariant] = useState('success');
+  const [successHideActions, setSuccessHideActions] = useState(false);
+  const [successAutoCloseMs, setSuccessAutoCloseMs] = useState(null);
 
   // Confirm dialog state
   const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, variant: 'danger', loading: false });
@@ -330,23 +339,34 @@ const Dashboard = () => {
     }
   };
 
-  const handleReject = (id) => {
+  const handleDeleteUser = (id, options = {}) => {
+    const { title = 'Delete User', message = 'This will permanently delete this user account. This action cannot be undone.', confirmLabel = 'Delete' } = options;
     openConfirm({
-      title: 'Reject Request',
-      message: 'This will permanently delete the faculty request. This action cannot be undone.',
-      confirmLabel: 'Yes, Reject',
+      title,
+      message,
+      confirmLabel,
       variant: 'danger',
       onConfirm: async () => {
         setConfirmDialog(d => ({ ...d, loading: true }));
         try {
           await axiosInstance.delete(`/admin/users/${id}`);
+
+          // Store details for success card
+          const deletedUser = allUsers.find(u => u._id === id);
+          setSuccessEvent({ title: deletedUser?.name || 'User Account' });
+          setSuccessVariant('success');
+          setSuccessHideActions(true);
+          setSuccessAutoCloseMs(1500);
+
           setAllUsers(prev => prev.filter(u => u._id !== id));
           setPendingFaculty(prev => prev.filter(u => u._id !== id));
           closeConfirm();
-          showToast('Request rejected and removed.');
+
+          // Delay for smooth transition
+          setTimeout(() => setShowSuccessModal(true), 300);
         } catch (err) {
           closeConfirm();
-          showToast('Failed to reject request.', 'error');
+          showToast('Failed to delete user.', 'error');
         }
       },
     });
@@ -354,46 +374,7 @@ const Dashboard = () => {
 
   const openProfilePanel = () => setShowProfilePanel(true);
 
-  const handleRegister = async (eventId) => {
-    try {
-      await axiosInstance.post(`/events/${eventId}/register`);
-      showToast('Successfully registered for the event!');
-      // Refresh events data
-      const eventsRes = await axiosInstance.get('/events');
-      setEvents(eventsRes.data.data || []);
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to register.', 'error');
-    }
-  };
-
-  // Re-define handleRegister with confirmation
-  const handleRegisterConfirm = (eventId) => {
-    openConfirm({
-      title: 'Confirm Registration',
-      message: 'Are you sure you want to register for this event? Your details will be shared with the event coordinator.',
-      confirmLabel: 'Register Now',
-      variant: 'primary',
-      onConfirm: async () => {
-        setConfirmDialog(d => ({ ...d, loading: true }));
-        try {
-          await axiosInstance.post(`/events/${eventId}/register`);
-          showToast('Successfully registered for the event!');
-          const eventsRes = await axiosInstance.get('/events');
-          setEvents(eventsRes.data.data || []);
-          closeConfirm();
-        } catch (err) {
-          closeConfirm();
-          showToast(err.response?.data?.message || 'Failed to register.', 'error');
-        }
-      },
-    });
-  };
-
-  const handleViewDetails = (eventId) => {
-    handleRouteChange('Events');
-  };
-
-  // Data States
+  // Data States — declared BEFORE any handlers that use setEvents
   const [events, setEvents] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -407,6 +388,65 @@ const Dashboard = () => {
   const [galleryEvents, setGalleryEvents] = useState([]);
   const [galleryLoading, setGalleryLoading] = useState(false);
   const [lightbox, setLightbox] = useState({ open: false, images: [], index: 0 });
+
+  // Register for event with confirmation dialog
+  const handleRegisterConfirm = (eventId) => {
+    openConfirm({
+      title: 'Confirm Registration',
+      message: 'Are you sure you want to register for this event? Your details will be shared with the event coordinator.',
+      confirmLabel: 'Register Now',
+      variant: 'info',
+      onConfirm: async () => {
+        setConfirmDialog(d => ({ ...d, loading: true }));
+        try {
+          await axiosInstance.post(`/events/${eventId}/register`);
+
+          // Find event for SuccessModal details
+          const registeredEvent = events.find(e => e._id === eventId);
+          setSuccessEvent(registeredEvent);
+          setSuccessVariant('success');
+          setSuccessHideActions(false);
+          setSuccessAutoCloseMs(null);
+
+          const eventsRes = await axiosInstance.get('/events');
+          setEvents(eventsRes.data.data || []);
+
+          closeConfirm();
+          // Delay modal slightly for smoother transition after confirm dialog closes
+          setTimeout(() => setShowSuccessModal(true), 300);
+        } catch (err) {
+          closeConfirm();
+          showToast(err.response?.data?.message || 'Failed to register.', 'error');
+        }
+      },
+    });
+  };
+
+  const handleShowStatus = (event) => {
+    setSuccessEvent(event);
+    setSuccessVariant('info');
+    setShowSuccessModal(true);
+  };
+
+  const handleRegister = (eventId) => {
+    const event = upcomingEvents.find(e => e._id === eventId) || liveEvent;
+    if (event) {
+      setEventSearch(event.title);
+      setActiveRoute('Events');
+    } else {
+      setActiveRoute('Events');
+    }
+  };
+
+  const handleViewDetails = (eventId) => {
+    const event = upcomingEvents.find(e => e._id === eventId) || liveEvent;
+    if (event) {
+      setEventSearch(event.title);
+      setActiveRoute('Events');
+    } else {
+      setActiveRoute('Events');
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -459,6 +499,7 @@ const Dashboard = () => {
   const handleRouteChange = (route) => {
     setActiveRoute(route);
     setMobileSidebarOpen(false);
+    setEventSearch(''); // Reset any redirection search
   };
 
   const getGreeting = () => {
@@ -473,6 +514,15 @@ const Dashboard = () => {
     { name: 'Events', icon: Calendar },
     { name: 'Announcements', icon: Bell },
     { name: 'Gallery', icon: Image },
+
+    // Student features
+    ...(user?.role?.toLowerCase() === 'student'
+      ? [
+        { name: 'My Registrations', icon: CheckCheck },
+        { name: 'My Applications', icon: Briefcase },
+        { name: 'My Event Requests', icon: FileText },
+      ]
+      : []),
 
     // Faculty features
     ...(user?.role?.toLowerCase() === 'faculty'
@@ -514,8 +564,10 @@ const Dashboard = () => {
   );
 
   const quickActions = user.role === 'student' ? [
-    { name: 'Volunteer', icon: Hand, subtitle: 'Apply for volunteer roles', path: '/recruitment' },
-    { name: 'My Applications', icon: FileText, subtitle: 'Track your event applications', path: '/recruitment' }
+    { name: 'Browse Events', icon: Calendar, subtitle: 'Discover and register for events', action: 'Events' },
+    { name: 'My Registrations', icon: CheckCheck, subtitle: 'View events you are signed up for', action: 'My Registrations' },
+    { name: 'Apply for Roles', icon: Briefcase, subtitle: 'Volunteer and recruitment roles', action: 'My Applications' },
+    { name: 'Request an Event', icon: Plus, subtitle: 'Submit a new event proposal', action: 'My Event Requests' },
   ] : user.role === 'faculty' ? [
     { name: 'Create Event', icon: UserPlus, subtitle: 'Organize a new event', path: '/faculty' },
     { name: 'Manage Events', icon: Calendar, subtitle: 'View and edit your events', path: '/faculty' },
@@ -869,6 +921,22 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
               {/* Left Column - Main Content */}
               <div className="lg:col-span-2 space-y-4 md:space-y-6">
+                {/* Student Welcome Banner */}
+                {user && user.role === 'student' && (
+                  <div className="relative rounded-3xl overflow-hidden bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-600 p-6 md:p-8 text-white shadow-xl animate-fadeIn mb-2">
+                    <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, rgba(255,255,255,0.8) 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
+                    <div className="relative z-10">
+                      <p className="text-blue-200 text-xs font-bold uppercase tracking-widest mb-1">Student Portal</p>
+                      <h2 className="text-2xl md:text-3xl font-black mb-2">Welcome Back, {user.name.split(' ')[0]}! 👋</h2>
+                      <p className="text-blue-100 text-sm max-w-md opacity-90 leading-relaxed">Stay updated with campus events, track your registrations, and explore new recruitment opportunities.</p>
+                      <div className="flex gap-3 mt-5">
+                        <button onClick={() => handleRouteChange('Events')} className="px-4 py-2 bg-white text-blue-600 rounded-xl font-bold text-xs shadow-lg hover:shadow-white/20 transition-all">Browse Events</button>
+                        <button onClick={() => handleRouteChange('My Registrations')} className="px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-xl border border-white/20 transition-all font-semibold text-xs">My Activity</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Pending Faculty Requests (Admin Only) */}
                 {user && user.role === 'admin' && pendingFaculty.length > 0 && (
                   <section aria-label="Pending faculty requests">
@@ -904,7 +972,7 @@ const Dashboard = () => {
                               <Check size={14} /> Approve
                             </button>
                             <button
-                              onClick={() => handleReject(request._id)}
+                              onClick={() => handleDeleteUser(request._id, { title: 'Reject Faculty', message: 'Reject and delete this faculty registration request?', confirmLabel: 'Reject' })}
                               className="flex-1 sm:flex-none px-3 md:px-4 py-2 bg-red-500/10 text-red-600 hover:bg-red-500/20 rounded-lg font-semibold text-xs md:text-sm transition-colors flex items-center justify-center gap-1.5"
                               aria-label={`Reject ${request.name}`}
                             >
@@ -1010,14 +1078,27 @@ const Dashboard = () => {
                               >
                                 View Details
                               </button>
-                              {user.role?.toLowerCase() === 'student' && (
-                                <button
-                                  onClick={() => handleRegister(event._id)}
-                                  className="flex-1 px-3 md:px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/30 transition-all text-xs md:text-sm font-semibold"
-                                >
-                                  Register
-                                </button>
-                              )}
+                              {(() => {
+                                const isRegistered = event.registrations?.some(r => (r._id || r) === user._id);
+                                if (isRegistered) {
+                                  return (
+                                    <button
+                                      onClick={() => handleShowStatus(event)}
+                                      className="flex-1 px-3 py-2 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center gap-1.5 text-xs font-bold border border-emerald-100 shadow-sm hover:bg-emerald-100 transition-colors"
+                                    >
+                                      <CheckCircle size={14} /> Registered
+                                    </button>
+                                  );
+                                }
+                                return (
+                                  <button
+                                    onClick={() => handleRegister(event._id)}
+                                    className="flex-1 px-3 md:px-4 py-2 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:shadow-lg hover:shadow-blue-500/30 transition-all text-xs md:text-sm font-semibold"
+                                  >
+                                    Register
+                                  </button>
+                                );
+                              })()}
                             </div>
                           </div>
                         </article>
@@ -1199,14 +1280,20 @@ const Dashboard = () => {
             </div>
           )}
 
-          {activeRoute === 'Events' && <Events userRole={user.role} user={user} onRegister={handleRegisterConfirm} />}
+          {activeRoute === 'Events' && <Events userRole={user.role} user={user} onRegister={handleRegisterConfirm} onShowStatus={handleShowStatus} initialSearch={eventSearch} />}
           {activeRoute === 'Announcements' && <Announcements userRole={user.role} user={user} />}
           {activeRoute === 'Event Requests' && <EventRequests />}
           {activeRoute === 'Gallery' && <GalleryView galleryEvents={galleryEvents} galleryLoading={galleryLoading} setGalleryEvents={setGalleryEvents} setGalleryLoading={setGalleryLoading} lightbox={lightbox} setLightbox={setLightbox} axiosInstance={axiosInstance} userRole={user.role} user={user} openConfirm={openConfirm} closeConfirm={closeConfirm} setConfirmDialog={setConfirmDialog} />}
+
+          {/* Student Specific Views */}
+          {activeRoute === 'My Registrations' && <StudentMyRegistrationsView axiosInstance={axiosInstance} user={user} />}
+          {activeRoute === 'My Applications' && <StudentMyApplicationsView axiosInstance={axiosInstance} user={user} />}
+          {activeRoute === 'My Event Requests' && <StudentMyEventRequestsView axiosInstance={axiosInstance} user={user} />}
+
           {activeRoute === 'Recruitment' && <RecruitmentView axiosInstance={axiosInstance} user={user} openConfirm={openConfirm} closeConfirm={closeConfirm} setConfirmDialog={setConfirmDialog} showToast={showToast} />}
           {activeRoute === 'Approve Event' && <EventApprovalsView pendingEventRequests={pendingEventRequests} fetchEventRequests={fetchEventRequests} showToast={showToast} openConfirm={openConfirm} closeConfirm={closeConfirm} setConfirmDialog={setConfirmDialog} />}
-          {activeRoute === 'Faculty Requests' && <FacultyRequestsView pendingFaculty={pendingFaculty} allUsers={allUsers} fetchUsers={fetchUsers} handleApprove={handleApprove} handleReject={handleReject} showToast={showToast} />}
-          {activeRoute === 'User Management' && <UserManagementView allUsers={allUsers} />}
+          {activeRoute === 'Faculty Requests' && <FacultyRequestsView pendingFaculty={pendingFaculty} allUsers={allUsers} fetchUsers={fetchUsers} handleApprove={handleApprove} handleReject={(id) => handleDeleteUser(id, { title: 'Reject Faculty', confirmLabel: 'Reject' })} showToast={showToast} />}
+          {activeRoute === 'User Management' && <UserManagementView allUsers={allUsers} onDelete={(id) => handleDeleteUser(id)} />}
           {activeRoute === 'Settings' && <SettingsView user={user} stats={stats} allUsers={allUsers} />}
         </main>
       </div>
@@ -1237,6 +1324,20 @@ const Dashboard = () => {
         loading={confirmDialog.loading}
         onConfirm={confirmDialog.onConfirm}
         onCancel={closeConfirm}
+      />
+
+      {/* Success Feedback Modal */}
+      <SuccessModal
+        open={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        variant={successVariant}
+        eventDetails={successEvent}
+        onViewRegistrations={() => {
+          setShowSuccessModal(false);
+          handleRouteChange('My Registrations');
+        }}
+        hideActions={successHideActions}
+        autoCloseMs={successAutoCloseMs}
       />
 
       {/* Toast notification */}
@@ -1654,7 +1755,7 @@ const SettingsView = ({ user, stats, allUsers }) => {
 };
 
 // Gallery View Component
-const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalleryLoading, lightbox, setLightbox, axiosInstance, userRole, user }) => {
+const GalleryView = ({ galleryEvents, galleryLoading, setGalleryEvents, setGalleryLoading, lightbox, setLightbox, axiosInstance, userRole, user, openConfirm, closeConfirm, setConfirmDialog }) => {
   const [allEvents, setAllEvents] = React.useState([]);
   const [showUploadModal, setShowUploadModal] = React.useState(false);
   const [uploadEventId, setUploadEventId] = React.useState('');
@@ -2342,7 +2443,7 @@ const FacultyRequestsView = ({ pendingFaculty, allUsers, fetchUsers, handleAppro
 };
 
 // ─── User Management View (Admin) ────────────────────────────────────────────
-const UserManagementView = ({ allUsers }) => {
+const UserManagementView = ({ allUsers, onDelete }) => {
   const [roleFilter, setRoleFilter] = React.useState('all');
   const [branchFilter, setBranchFilter] = React.useState('ALL');
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -2470,14 +2571,26 @@ const UserManagementView = ({ allUsers }) => {
                 </div>
               )}
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
-                  <p className="font-semibold text-slate-900 text-sm truncate">{u.name}</p>
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full capitalize ${roleStyle[u.role] || 'bg-slate-100 text-slate-600'}`}>
-                    {u.role}
-                  </span>
-                  {u.role === 'faculty' && !u.isApproved && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Pending</span>
-                  )}
+                <div className="flex items-center justify-between gap-2 mb-0.5">
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                    <p className="font-semibold text-slate-900 text-sm truncate">{u.name}</p>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full capitalize ${roleStyle[u.role] || 'bg-slate-100 text-slate-600'}`}>
+                      {u.role}
+                    </span>
+                    {u.role === 'faculty' && !u.isApproved && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">Pending</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDelete(u._id, u.name);
+                    }}
+                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors flex-shrink-0"
+                    title="Delete User"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
                 <p className="text-xs text-slate-500 truncate">{u.email}</p>
                 {u.branch && (
@@ -2486,6 +2599,190 @@ const UserManagementView = ({ allUsers }) => {
                   </p>
                 )}
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const StudentMyRegistrationsView = ({ axiosInstance, user }) => {
+  const [registrations, setRegistrations] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRegistrations = async () => {
+      try {
+        const res = await axiosInstance.get('/events');
+        const allEvents = res.data.data || [];
+        // Filter events where the current user's ID is in the registrations array
+        const myRegs = allEvents.filter(e =>
+          e.registrations && e.registrations.some(r => (r._id || r).toString() === user._id.toString())
+        );
+        setRegistrations(myRegs);
+      } catch (err) {
+        console.error("Failed to fetch registrations:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRegistrations();
+  }, [axiosInstance, user._id]);
+
+  if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" /></div>;
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-900">My Registrations</h2>
+        <p className="text-slate-500 text-sm">Events you've registered to attend</p>
+      </div>
+
+      {registrations.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
+          <Calendar className="text-slate-300 mb-4" size={48} />
+          <p className="text-slate-500 font-medium text-lg">No registrations yet</p>
+          <p className="text-slate-400 text-sm">Go to the Events tab to browse and join upcoming events!</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {registrations.map(event => (
+            <div key={event._id} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200 hover:shadow-lg transition-all">
+              <div className="h-40 relative">
+                <img src={event.image || 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=400&h=200&fit=crop'} alt={event.title} className="w-full h-full object-cover" />
+                <span className="absolute top-3 right-3 px-3 py-1 bg-green-500 text-white text-[10px] font-bold rounded-full uppercase tracking-widest shadow-lg">Registered</span>
+              </div>
+              <div className="p-5">
+                <h3 className="font-bold text-slate-900 mb-2 truncate">{event.title}</h3>
+                <div className="space-y-2 text-xs text-slate-500">
+                  <p className="flex items-center gap-2"><Calendar size={14} /> {new Date(event.date).toLocaleDateString()}</p>
+                  <p className="flex items-center gap-2"><MapPin size={14} /> {event.venue}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const StudentMyApplicationsView = ({ axiosInstance, user }) => {
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchApplications = async () => {
+      try {
+        const res = await axiosInstance.get('/recruitments/my-applications');
+        setApplications(res.data.data || []);
+      } catch (err) {
+        console.error("Failed to fetch applications:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchApplications();
+  }, [axiosInstance, user._id]);
+
+  if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" /></div>;
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-900">My Applications</h2>
+        <p className="text-slate-500 text-sm">Track your volunteer and recruitment applications</p>
+      </div>
+
+      {applications.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
+          <Briefcase className="text-slate-300 mb-4" size={48} />
+          <p className="text-slate-500 font-medium text-lg">No applications found</p>
+          <p className="text-slate-400 text-sm">Keep an eye on the announcements for new recruitment opportunities!</p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {applications.map(app => (
+            <div key={app._id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-bold text-slate-900 text-lg">{app.recruitmentTitle}</h3>
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-tighter ${app.applicationStatus === 'selected' ? 'bg-emerald-100 text-emerald-600' :
+                    app.applicationStatus === 'rejected' ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
+                    }`}>
+                    {app.applicationStatus === 'applied' ? 'Pending' : app.applicationStatus}
+                  </span>
+                </div>
+                <p className="text-slate-500 text-sm mb-3">Role: <span className="font-semibold text-slate-700 capitalize">{app.roleType}</span></p>
+                <div className="flex flex-wrap gap-4 text-xs text-slate-400">
+                  <span className="flex items-center gap-1.5"><Calendar size={14} /> Applied on {new Date(app.appliedAt).toLocaleDateString()}</span>
+                  <span className="flex items-center gap-1.5"><Tag size={14} /> {app.branch || 'General'}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+const StudentMyEventRequestsView = ({ axiosInstance, user }) => {
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRequests = async () => {
+      try {
+        const res = await axiosInstance.get('/event-requests');
+        const allReqs = res.data.data || [];
+        // Filter by requestedBy user ID
+        const myReqs = allReqs.filter(r => (r.requestedBy?._id || r.requestedBy) === user._id);
+        setRequests(myReqs);
+      } catch (err) {
+        console.error("Failed to fetch event requests:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchRequests();
+  }, [axiosInstance, user._id]);
+
+  if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" /></div>;
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-900">My Event Requests</h2>
+        <p className="text-slate-500 text-sm">Status of your submitted event proposals</p>
+      </div>
+
+      {requests.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
+          <FileText className="text-slate-300 mb-4" size={48} />
+          <p className="text-slate-500 font-medium text-lg">No event requests</p>
+          <p className="text-slate-400 text-sm">Have a cool event idea? Submit a proposal to the admin!</p>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          {requests.map(req => (
+            <div key={req._id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+              <div className="flex justify-between items-start gap-4 mb-4">
+                <div>
+                  <h3 className="font-bold text-slate-900 text-lg mb-1">{req.title}</h3>
+                  <div className="flex items-center gap-3 text-xs text-slate-500">
+                    <span className="flex items-center gap-1.5"><Calendar size={14} /> {new Date(req.date).toLocaleDateString()}</span>
+                    <span className="flex items-center gap-1.5"><MapPin size={14} /> {req.venue}</span>
+                  </div>
+                </div>
+                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm ${req.status === 'approved' ? 'bg-emerald-500 text-white' :
+                  req.status === 'rejected' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'
+                  }`}>
+                  {req.status}
+                </span>
+              </div>
+              <p className="text-slate-600 text-sm line-clamp-2 italic">"{req.description}"</p>
             </div>
           ))}
         </div>

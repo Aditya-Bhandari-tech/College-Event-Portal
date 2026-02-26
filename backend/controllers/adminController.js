@@ -5,6 +5,7 @@ import Event from "../models/Event.js";
 import EventRequest from "../models/EventRequest.js";
 import Recruitment from "../models/Recruitment.js";
 import Announcement from "../models/Announcement.js";
+import Gallery from "../models/Gallery.js";
 
 // GET ALL USERS (ADMIN ONLY)
 export const getAllUsers = async (req, res, next) => {
@@ -134,15 +135,48 @@ export const approveUser = async (req, res, next) => {
 // DELETE USER (ADMIN ONLY)
 export const deleteUser = async (req, res, next) => {
   try {
-    const user = await User.findByIdAndDelete(req.params.id);
+    const userId = req.params.id;
+    const user = await User.findById(userId);
 
     if (!user) {
       return sendError(res, "User not found", 404);
     }
 
+    // --- CASCADING DELETE START ---
+
+    // 1. Delete all content created by this user
+    await Promise.all([
+      Event.deleteMany({ createdBy: userId }),
+      Recruitment.deleteMany({ createdBy: userId }),
+      EventRequest.deleteMany({
+        $or: [{ requestedBy: userId }, { reviewedBy: userId }]
+      }),
+      Announcement.deleteMany({ createdBy: userId }),
+      Gallery.deleteMany({ uploadedBy: userId })
+    ]);
+
+    // 2. Remove user from all lists where they might be referenced
+    await Promise.all([
+      // Remove from event registrations
+      Event.updateMany(
+        { registrations: userId },
+        { $pull: { registrations: userId } }
+      ),
+      // Remove from recruitment applicants
+      Recruitment.updateMany(
+        { "applicants.student": userId },
+        { $pull: { applicants: { student: userId } } }
+      )
+    ]);
+
+    // --- CASCADING DELETE END ---
+
+    // Finally, delete the user itself
+    await User.findByIdAndDelete(userId);
+
     return sendSuccess(
       res,
-      "User deleted successfully",
+      "User and all associated data deleted successfully",
       null,
       200
     );

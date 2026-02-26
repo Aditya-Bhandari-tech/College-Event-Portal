@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axiosInstance from '../api/axios';
-import { Calendar, MapPin, Search, Clock, Users, Plus, Edit2, Trash2, X, AlertCircle, FileText } from 'lucide-react';
+import { Calendar, MapPin, Search, Clock, Users, Plus, Edit2, Trash2, X, AlertCircle, FileText, CheckCircle } from 'lucide-react';
 import Loader from '../components/common/Loader';
 import EmptyState from '../components/common/EmptyState';
 import Button from '../components/common/Button';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import AttendeesModal from '../components/specific/AttendeesModal';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+import SuccessModal from '../components/common/SuccessModal';
 
 // Full branch name mapping
 const BRANCH_LABELS = {
@@ -31,24 +33,6 @@ const BRANCH_OPTIONS = [
 
 const EMPTY_FORM = { title: '', description: '', date: '', venue: '', branch: 'ALL' };
 
-/* ─── Confirm Delete Dialog ─── */
-const DeleteConfirm = ({ item, onConfirm, onCancel, loading }) => (
-    <div className="fixed inset-0 bg-black/50 z-[110] backdrop-blur-sm flex items-center justify-center p-4">
-        <div className="bg-white w-full max-w-xs rounded-3xl shadow-2xl p-6 text-center animate-fadeIn">
-            <div className="w-14 h-14 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Trash2 size={24} className="text-red-500" />
-            </div>
-            <h3 className="font-bold text-lg text-slate-900 mb-1">Delete Event?</h3>
-            <p className="text-sm text-slate-500 mb-6">
-                "<span className="font-semibold text-slate-700">{item?.title}</span>" will be permanently deleted.
-            </p>
-            <div className="flex gap-3">
-                <Button variant="secondary" className="flex-1" onClick={onCancel} disabled={loading}>Cancel</Button>
-                <Button variant="danger" className="flex-1" onClick={onConfirm} loading={loading}>Delete</Button>
-            </div>
-        </div>
-    </div>
-);
 
 /* ─── Create / Edit Card (Inline) ─── */
 const EventForm = ({ event, onCancel, onSaved, userRole }) => {
@@ -186,12 +170,19 @@ const EventForm = ({ event, onCancel, onSaved, userRole }) => {
    Main Events Component
    Converted to Tabbed Interface (No Overlays)
 ════════════════════════════════════════════════ */
-const Events = ({ userRole, user, onRegister }) => {
+const Events = ({ userRole, user, onRegister, onShowStatus, initialSearch = '' }) => {
     const [events, setEvents] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, setSearchTerm] = useState(initialSearch);
     const [tab, setTab] = useState('list'); // 'list' | 'create'
+
+    useEffect(() => {
+        if (initialSearch) {
+            setSearchTerm(initialSearch);
+            setFilter('all'); // Ensure we look in all categories when searching from dashboard
+        }
+    }, [initialSearch]);
 
     // Form/Edit state
     const [editingEvent, setEditingEvent] = useState(null);
@@ -199,6 +190,8 @@ const Events = ({ userRole, user, onRegister }) => {
     const [deleteLoading, setDeleteLoading] = useState(false);
     const [showAttendeesModal, setShowAttendeesModal] = useState(false);
     const [selectedItem, setSelectedItem] = useState(null);
+    const [showDeleteSuccess, setShowDeleteSuccess] = useState(false);
+    const [lastDeletedTitle, setLastDeletedTitle] = useState('');
 
     const canManage = userRole === 'admin' || userRole === 'faculty';
 
@@ -225,9 +218,9 @@ const Events = ({ userRole, user, onRegister }) => {
         if (searchTerm) {
             const lower = searchTerm.toLowerCase();
             filtered = filtered.filter(e =>
-                e.title.toLowerCase().includes(lower) ||
-                e.description.toLowerCase().includes(lower) ||
-                e.venue.toLowerCase().includes(lower)
+                e.title?.toLowerCase().includes(lower) ||
+                e.description?.toLowerCase().includes(lower) ||
+                e.venue?.toLowerCase().includes(lower)
             );
         }
         return filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -247,11 +240,16 @@ const Events = ({ userRole, user, onRegister }) => {
     const handleDelete = async () => {
         setDeleteLoading(true);
         try {
+            const title = deleteTarget.title;
             await axiosInstance.delete(`/events/${deleteTarget._id}`);
             setEvents(prev => prev.filter(e => e._id !== deleteTarget._id));
+            setLastDeletedTitle(title);
             setDeleteTarget(null);
+            setShowDeleteSuccess(true);
         } catch (err) {
             console.error('Delete failed', err);
+            // We can still use a toast or another SuccessModal with variant="error" if desired, 
+            // but for now, we'll just log it. The user specifically asked for professional cards for deletion.
         } finally {
             setDeleteLoading(false);
         }
@@ -359,7 +357,7 @@ const Events = ({ userRole, user, onRegister }) => {
                             {['all', 'upcoming', 'past'].map(f => (
                                 <button
                                     key={f}
-                                    onClick={() => setFilter(f)}
+                                    onClick={() => { setFilter(f); setSearchTerm(''); }}
                                     className={`px-6 py-2.5 rounded-xl text-sm font-bold capitalize transition-all whitespace-nowrap ${filter === f ? 'bg-slate-800 text-white shadow-lg' : 'text-slate-500 hover:text-slate-700'}`}
                                 >
                                     {f} Events
@@ -391,6 +389,7 @@ const Events = ({ userRole, user, onRegister }) => {
                             {filteredEvents.length > 0 ? filteredEvents.map(event => {
                                 const isUpcoming = new Date(event.date) >= new Date();
                                 const canEdit = canEditEvent(event);
+                                const isRegistered = event.registrations?.some(r => (r._id || r) === user?._id);
 
                                 return (
                                     <article
@@ -450,11 +449,13 @@ const Events = ({ userRole, user, onRegister }) => {
                                             {/* Action Button */}
                                             {userRole?.toLowerCase() === 'student' && isUpcoming ? (
                                                 <button
-                                                    onClick={() => onRegister(event._id)}
-                                                    disabled={event.registrations?.includes(user?._id)}
-                                                    className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${event.registrations?.includes(user?._id) ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-xl shadow-blue-100 hover:shadow-blue-200 hover:-translate-y-1'}`}
+                                                    onClick={() => isRegistered ? onShowStatus(event) : onRegister(event._id)}
+                                                    className={`w-full py-4 rounded-2xl font-black text-sm uppercase tracking-widest transition-all ${isRegistered ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-xl shadow-blue-100 hover:shadow-blue-200 hover:-translate-y-1'}`}
                                                 >
-                                                    {event.registrations?.includes(user?._id) ? 'Successfully Registered' : 'Register Now'}
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        {isRegistered && <CheckCircle size={16} />}
+                                                        {isRegistered ? 'Registered' : 'Register Now'}
+                                                    </div>
                                                 </button>
                                             ) : userRole !== 'student' && (
                                                 <button
@@ -476,27 +477,45 @@ const Events = ({ userRole, user, onRegister }) => {
                         </div>
                     )}
                 </>
-            )}
+            )
+            }
 
             {/* ── Light Dialogs ── */}
             {deleteTarget && (
-                <DeleteConfirm
-                    item={deleteTarget}
+                <ConfirmDialog
+                    open={!!deleteTarget}
+                    variant="danger"
+                    title="Delete Event?"
+                    message={`"${deleteTarget.title}" will be permanently removed. This action cannot be undone.`}
+                    confirmLabel="Delete Event"
+                    loading={deleteLoading}
                     onConfirm={handleDelete}
                     onCancel={() => setDeleteTarget(null)}
-                    loading={deleteLoading}
                 />
             )}
 
-            {showAttendeesModal && selectedItem && (
-                <AttendeesModal
-                    event={selectedItem}
-                    onClose={() => { setShowAttendeesModal(false); setSelectedItem(null); }}
-                    userRole={userRole}
-                    onDownloadPDF={handleDownloadPDF}
+            {showDeleteSuccess && (
+                <SuccessModal
+                    open={showDeleteSuccess}
+                    onClose={() => setShowDeleteSuccess(false)}
+                    title="Event Deleted"
+                    message={`"${lastDeletedTitle}" has been successfully removed from the system.`}
+                    hideActions={true}
+                    autoCloseMs={1500}
                 />
             )}
-        </div>
+
+            {
+                showAttendeesModal && selectedItem && (
+                    <AttendeesModal
+                        event={selectedItem}
+                        onClose={() => { setShowAttendeesModal(false); setSelectedItem(null); }}
+                        userRole={userRole}
+                        onDownloadPDF={handleDownloadPDF}
+                    />
+                )
+            }
+        </div >
     );
 };
 

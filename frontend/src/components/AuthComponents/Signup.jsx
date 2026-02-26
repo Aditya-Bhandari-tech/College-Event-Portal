@@ -7,6 +7,7 @@ import RoleSelectionModal from './RoleSelectionModal';
 import { jwtDecode } from 'jwt-decode';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shield, Users, CalendarCheck, ArrowLeft, XCircle, LogIn, MailWarning } from 'lucide-react';
+import { useAuth } from '../../contexts/useAuth';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CSS KEYFRAMES  (injected once — zero JS overhead at runtime)
@@ -186,6 +187,7 @@ const FEATURES = [
 // ─────────────────────────────────────────────────────────────────────────────
 const Signup = () => {
   const navigate = useNavigate();
+  const { syncUser } = useAuth();
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -215,15 +217,17 @@ const Signup = () => {
     try {
       setLoading(true); setError(''); setSuccessMessage('');
       const res = await axiosInstance.post('/auth/google', { ...googleUserData, ...roleData, isGoogleAuth: true });
+      setShowRoleModal(false);
       if (res.data.token) {
+        // Student account — log in immediately
         localStorage.setItem('token', res.data.token);
         localStorage.setItem('user', JSON.stringify(res.data.user));
-        setShowRoleModal(false);
+        syncUser(); // sync AuthContext in-memory state
         const role = res.data.user.role;
-        navigate(role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student');
+        navigate(role === 'admin' ? '/admin' : role === 'faculty' ? '/faculty' : '/student', { replace: true });
       } else {
-        setShowRoleModal(false);
-        setSuccessMessage('Your request has been sent to admin for approval.');
+        // Faculty account — pending admin approval
+        setSuccessMessage('✅ Account created! Your faculty account is pending admin approval. Redirecting to login…');
         setTimeout(() => navigate('/login'), 3000);
       }
     } catch (err) {
@@ -258,8 +262,13 @@ const Signup = () => {
           onGoLogin={() => navigate('/login')}
         />
       )}
-      {showRoleModal && (
-        <RoleSelectionModal onSubmit={handleRoleSubmit} onClose={() => setShowRoleModal(false)} />
+      {showRoleModal && googleUserData && (
+        <RoleSelectionModal
+          isOpen={showRoleModal}
+          onClose={() => { setShowRoleModal(false); setGoogleUserData(null); }}
+          onSubmit={handleRoleSubmit}
+          userName={googleUserData.name}
+        />
       )}
 
       {/* ══════════════════════════════════════════════════════════════════

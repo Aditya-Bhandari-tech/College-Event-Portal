@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     Calendar, Users, Bell, Search, Image,
     Plus, FileText, CheckCircle, XCircle,
     UserCheck, UserPlus, ChevronRight, Menu, LogOut, Award, Check, X,
-    Upload, User, ImageIcon
+    Upload, User, ImageIcon, Trash2, CheckCheck, BriefcaseBusiness
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../api/axios';
@@ -22,19 +22,33 @@ import EventRequests from './EventRequests';
 
 // ─── HELPER COMPONENTS ────────────────────────────────────────────────────────
 
-const StatsCard = ({ icon: Icon, label, count, color }) => (
-    <div className={`bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-${color}-500`}>
-        <div className="flex justify-between items-start">
-            <div>
-                <p className="text-slate-500 text-sm font-medium">{label}</p>
-                <h3 className="text-2xl font-bold mt-1">{count}</h3>
-            </div>
-            <div className={`p-2 bg-${color}-50 text-${color}-600 rounded-lg`}>
-                <Icon size={20} />
+const StatsCard = ({ icon: Icon, label, count, color }) => {
+    const { darkMode: dm } = useTheme();
+    // Explicit color mapping to avoid Tailwind purge issues with dynamic template strings
+    const colorMap = {
+        blue: { border: 'border-l-blue-500', iconBg: 'bg-blue-50', iconText: 'text-blue-600', dmIconBg: 'bg-blue-500/10' },
+        indigo: { border: 'border-l-indigo-500', iconBg: 'bg-indigo-50', iconText: 'text-indigo-600', dmIconBg: 'bg-indigo-500/10' },
+        violet: { border: 'border-l-violet-500', iconBg: 'bg-violet-50', iconText: 'text-violet-600', dmIconBg: 'bg-violet-500/10' },
+        emerald: { border: 'border-l-emerald-500', iconBg: 'bg-emerald-50', iconText: 'text-emerald-600', dmIconBg: 'bg-emerald-500/10' },
+        amber: { border: 'border-l-amber-500', iconBg: 'bg-amber-50', iconText: 'text-amber-600', dmIconBg: 'bg-amber-500/10' },
+        rose: { border: 'border-l-rose-500', iconBg: 'bg-rose-50', iconText: 'text-rose-600', dmIconBg: 'bg-rose-500/10' },
+    };
+    const c = colorMap[color] || colorMap.blue;
+
+    return (
+        <div className={`${dm ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} p-6 rounded-2xl shadow-sm border-2 border-l-4 ${c.border} transition-all hover:shadow-md`}>
+            <div className="flex justify-between items-start">
+                <div>
+                    <p className={`${dm ? 'text-slate-400' : 'text-slate-500'} text-xs font-bold uppercase tracking-wider`}>{label}</p>
+                    <h3 className={`${dm ? 'text-white' : 'text-slate-900'} text-3xl font-black mt-1`}>{count}</h3>
+                </div>
+                <div className={`p-2.5 ${dm ? c.dmIconBg : c.iconBg} ${c.iconText} rounded-xl shadow-sm`}>
+                    <Icon size={20} />
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
 const SectionHeader = ({ icon: Icon, title, subtitle, color = 'blue', action }) => {
     const colors = {
@@ -434,6 +448,132 @@ const FacultyDashboard = () => {
     const [activeRoute, setActiveRoute] = useState('Dashboard');
     const [showProfilePanel, setShowProfilePanel] = useState(false);
 
+    // ── Notification state ───────────────────────────────────────
+    const [notifOpen, setNotifOpen] = useState(false);
+    const [notifClosing, setNotifClosing] = useState(false);
+    const [notifications, setNotifications] = useState([]);
+    const [notifLoading, setNotifLoading] = useState(false);
+    const [readIds, setReadIds] = useState(new Set());
+    const [clearedIds, setClearedIds] = useState(new Set());
+    const notifRef = useRef(null);
+    const notifCloseTimer = useRef(null);
+
+    const notifReadKey = user ? `notif_read_${user._id}` : null;
+    const notifClearedKey = user ? `notif_cleared_${user._id}` : null;
+
+    const timeAgo = (dateStr) => {
+        const diff = Date.now() - new Date(dateStr).getTime();
+        const m = Math.floor(diff / 60000);
+        if (m < 1) return 'just now';
+        if (m < 60) return `${m}m ago`;
+        const h = Math.floor(m / 60);
+        if (h < 24) return `${h}h ago`;
+        return `${Math.floor(h / 24)}d ago`;
+    };
+
+    const fetchNotifications = useCallback(async () => {
+        setNotifLoading(true);
+        try {
+            const [eventsRes, announcementsRes, recruitmentsRes] = await Promise.allSettled([
+                axiosInstance.get('/events'),
+                axiosInstance.get('/announcements'),
+                axiosInstance.get('/recruitments'),
+            ]);
+            const items = [];
+
+            if (eventsRes.status === 'fulfilled') {
+                (eventsRes.value.data?.data || []).forEach(e => {
+                    items.push({
+                        id: `event_${e._id}`,
+                        type: 'event',
+                        title: e.title,
+                        subtitle: `Event · ${e.venue || 'Campus'}`,
+                        time: e.createdAt || e.date,
+                        route: 'Events',
+                    });
+                });
+            }
+            if (announcementsRes.status === 'fulfilled') {
+                (announcementsRes.value.data?.data || []).forEach(a => {
+                    items.push({
+                        id: `ann_${a._id}`,
+                        type: 'announcement',
+                        title: a.title,
+                        subtitle: `Announcement by ${a.createdBy?.name || 'Faculty'}`,
+                        time: a.createdAt,
+                        route: 'Announcements',
+                    });
+                });
+            }
+            if (recruitmentsRes.status === 'fulfilled') {
+                (recruitmentsRes.value.data?.data || recruitmentsRes.value.data || []).forEach(r => {
+                    if (r.applicants?.length > 0) {
+                        items.push({
+                            id: `recruit_${r._id}`,
+                            type: 'recruitment',
+                            title: r.title || 'Recruitment',
+                            subtitle: `${r.applicants.length} applicant(s) waiting`,
+                            time: r.createdAt,
+                            route: 'Recruitment',
+                        });
+                    }
+                });
+            }
+
+            items.sort((a, b) => new Date(b.time) - new Date(a.time));
+            setNotifications(items);
+        } catch (err) {
+            console.error('Failed to fetch notifications:', err);
+        } finally {
+            setNotifLoading(false);
+        }
+    }, []);
+
+    const visibleNotifications = notifications.filter(n => !clearedIds.has(n.id));
+    const unreadCount = visibleNotifications.filter(n => !readIds.has(n.id)).length;
+
+    const markRead = (id) => setReadIds(prev => {
+        const next = new Set(prev); next.add(id);
+        if (notifReadKey) localStorage.setItem(notifReadKey, JSON.stringify([...next]));
+        return next;
+    });
+
+    const markAllRead = () => {
+        const allIds = notifications.map(n => n.id);
+        setReadIds(prev => {
+            const next = new Set([...prev, ...allIds]);
+            if (notifReadKey) localStorage.setItem(notifReadKey, JSON.stringify([...next]));
+            return next;
+        });
+    };
+
+    const closeNotifPanel = () => {
+        setNotifClosing(true);
+        clearTimeout(notifCloseTimer.current);
+        notifCloseTimer.current = setTimeout(() => { setNotifOpen(false); setNotifClosing(false); }, 150);
+    };
+
+    const clearAllNotifications = () => {
+        const allIds = notifications.map(n => n.id);
+        setClearedIds(prev => {
+            const next = new Set([...prev, ...allIds]);
+            if (notifClearedKey) localStorage.setItem(notifClearedKey, JSON.stringify([...next]));
+            return next;
+        });
+        setReadIds(prev => {
+            const next = new Set([...prev, ...allIds]);
+            if (notifReadKey) localStorage.setItem(notifReadKey, JSON.stringify([...next]));
+            return next;
+        });
+        closeNotifPanel();
+    };
+
+    const handleNotifClick = (notif) => {
+        markRead(notif.id);
+        closeNotifPanel();
+        handleRouteChange(notif.route);
+    };
+
     // Stats
     const [stats, setStats] = useState({
         ongoing: 0,
@@ -452,23 +592,40 @@ const FacultyDashboard = () => {
     });
 
     useEffect(() => {
-        // Load user from localStorage as initial state
         const storedUser = localStorage.getItem('user');
         if (storedUser) {
             try { setUser(JSON.parse(storedUser)); } catch (_) { }
         }
-
-        // Fetch fresh user data from server
         axiosInstance.get('/users/me')
             .then(res => {
                 const freshUser = res.data?.data || res.data;
-                if (freshUser) {
-                    setUser(freshUser);
-                    localStorage.setItem('user', JSON.stringify(freshUser));
-                }
+                if (freshUser) { setUser(freshUser); localStorage.setItem('user', JSON.stringify(freshUser)); }
             })
             .catch(() => { });
     }, []);
+
+    // Load persisted read/cleared IDs
+    useEffect(() => {
+        if (!user?._id) return;
+        try {
+            setReadIds(new Set(JSON.parse(localStorage.getItem(`notif_read_${user._id}`) || '[]')));
+            setClearedIds(new Set(JSON.parse(localStorage.getItem(`notif_cleared_${user._id}`) || '[]')));
+        } catch { }
+    }, [user?._id]);
+
+    // Fetch notifications when user is ready
+    useEffect(() => { if (user) fetchNotifications(); }, [user, fetchNotifications]);
+
+    // Cleanup timer on unmount
+    useEffect(() => () => clearTimeout(notifCloseTimer.current), []);
+
+    // Close panel on outside click
+    useEffect(() => {
+        if (!notifOpen) return;
+        const handler = (e) => { if (notifRef.current && !notifRef.current.contains(e.target)) closeNotifPanel(); };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, [notifOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
         if (!user) return;
@@ -599,6 +756,15 @@ const FacultyDashboard = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Collapse Toggle (desktop only) */}
+                <button
+                    onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                    className="hidden md:flex absolute -right-3 top-8 w-6 h-6 bg-slate-800 border border-slate-700 rounded-full items-center justify-center text-slate-500 hover:text-white hover:bg-slate-700 transition-all shadow-lg"
+                    aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                >
+                    <ChevronRight size={14} className={`transition-transform ${sidebarCollapsed ? '' : 'rotate-180'}`} />
+                </button>
             </aside>
 
             {/* Main Content */}
@@ -611,6 +777,102 @@ const FacultyDashboard = () => {
                         </div>
                         <div className="flex items-center gap-2 md:gap-4 flex-1 sm:flex-none justify-end">
                             <DarkModeToggle />
+
+                            {/* Notification Bell */}
+                            <div className="relative" ref={notifRef}>
+                                <button
+                                    onClick={() => {
+                                        if (notifOpen || notifClosing) { closeNotifPanel(); }
+                                        else { setNotifOpen(true); fetchNotifications(); }
+                                    }}
+                                    className="relative p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                                    aria-label={`Notifications${unreadCount > 0 ? `, ${unreadCount} unread` : ''}`}
+                                >
+                                    <Bell size={20} className={(notifOpen || notifClosing) ? 'text-blue-600' : 'text-slate-600'} />
+                                    {unreadCount > 0 && (
+                                        <span className="absolute top-1 right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold px-0.5" aria-hidden="true">
+                                            {unreadCount > 99 ? '99+' : unreadCount}
+                                        </span>
+                                    )}
+                                </button>
+
+                                {/* Notification Dropdown Panel */}
+                                {(notifOpen || notifClosing) && (
+                                    <div className={`absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 z-50 overflow-hidden ${notifClosing ? 'animate-notifSlideOut' : 'animate-notifSlide'}`}>
+                                        {/* Panel Header */}
+                                        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
+                                            <div className="flex items-center gap-2">
+                                                <Bell size={16} className="text-blue-600" />
+                                                <h3 className="font-bold text-slate-900 text-sm">Notifications</h3>
+                                                {unreadCount > 0 && (
+                                                    <span className="bg-red-100 text-red-600 text-xs font-bold px-2 py-0.5 rounded-full">{unreadCount} new</span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                {unreadCount > 0 && (
+                                                    <button onClick={markAllRead} className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-semibold px-2 py-1 hover:bg-blue-50 rounded-lg transition-colors" title="Mark all as read">
+                                                        <CheckCheck size={13} /> All read
+                                                    </button>
+                                                )}
+                                                {visibleNotifications.length > 0 && (
+                                                    <button onClick={clearAllNotifications} className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 font-semibold px-2 py-1 hover:bg-red-50 rounded-lg transition-colors" title="Clear all">
+                                                        <Trash2 size={13} /> Clear
+                                                    </button>
+                                                )}
+                                                <button onClick={closeNotifPanel} className="p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600">
+                                                    <X size={16} />
+                                                </button>
+                                            </div>
+                                        </div>
+
+                                        {/* Notification List */}
+                                        <div className="max-h-[420px] overflow-y-auto divide-y divide-slate-50">
+                                            {notifLoading ? (
+                                                <div className="flex items-center justify-center py-10 gap-3 text-slate-400">
+                                                    <div className="w-5 h-5 border-2 border-slate-200 border-t-blue-500 rounded-full animate-spin" />
+                                                    <span className="text-sm">Loading…</span>
+                                                </div>
+                                            ) : visibleNotifications.length === 0 ? (
+                                                <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                                                    <div className="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center mb-3">
+                                                        <Bell size={22} className="text-slate-300" />
+                                                    </div>
+                                                    <p className="text-sm font-medium">All caught up!</p>
+                                                    <p className="text-xs mt-1">No notifications</p>
+                                                </div>
+                                            ) : visibleNotifications.map(notif => {
+                                                const isUnread = !readIds.has(notif.id);
+                                                const cfg = {
+                                                    event: { bg: 'bg-blue-100', text: 'text-blue-600', Icon: Calendar, label: 'Event' },
+                                                    announcement: { bg: 'bg-amber-100', text: 'text-amber-600', Icon: Bell, label: 'Announcement' },
+                                                    recruitment: { bg: 'bg-emerald-100', text: 'text-emerald-600', Icon: BriefcaseBusiness, label: 'Recruitment' },
+                                                }[notif.type] || { bg: 'bg-slate-100', text: 'text-slate-600', Icon: Bell, label: 'Notice' };
+                                                const TypeIcon = cfg.Icon;
+                                                return (
+                                                    <button
+                                                        key={notif.id}
+                                                        onClick={() => handleNotifClick(notif)}
+                                                        className={`w-full flex items-start gap-3 px-4 py-3.5 text-left hover:bg-slate-50 transition-colors ${isUnread ? 'bg-blue-50/40' : ''}`}
+                                                    >
+                                                        <div className={`w-9 h-9 rounded-xl ${cfg.bg} flex items-center justify-center flex-shrink-0 mt-0.5`}>
+                                                            <TypeIcon size={16} className={cfg.text} />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-start justify-between gap-1">
+                                                                <p className={`text-sm leading-snug truncate ${isUnread ? 'font-semibold text-slate-900' : 'font-medium text-slate-700'}`}>{notif.title}</p>
+                                                                {isUnread && <span className="w-2 h-2 rounded-full bg-blue-500 flex-shrink-0 mt-1" />}
+                                                            </div>
+                                                            <p className="text-xs text-slate-500 mt-0.5 truncate">{notif.subtitle}</p>
+                                                            <p className="text-[10px] text-slate-400 mt-1">{timeAgo(notif.time)}</p>
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
                             <button onClick={() => setShowProfilePanel(true)} className="w-9 h-9 md:w-10 md:h-10 rounded-full flex items-center justify-center font-bold text-sm overflow-hidden ring-2 ring-blue-500/30 shadow-md hover:ring-blue-500/60 transition-all">
                                 {user.profilePic?.url ? <img src={user.profilePic.url} alt={user.name} className="w-full h-full object-cover" /> : <span className="bg-blue-100 text-blue-600 w-full h-full flex items-center justify-center">{user.name.charAt(0)}</span>}
                             </button>
@@ -727,6 +989,23 @@ const FacultyDashboard = () => {
             <style>{`
                 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
                 .animate-fadeIn { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+                
+                .dark .bg-white { background-color: #1e293b !important; }
+                .dark .text-slate-900 { color: #f8fafc !important; }
+                .dark .text-slate-800 { color: #f1f5f9 !important; }
+                .dark .text-slate-700 { color: #e2e8f0 !important; }
+                .dark .text-slate-600 { color: #cbd5e1 !important; }
+                .dark .text-slate-500 { color: #94a3b8 !important; }
+                .dark .border-slate-200 { border-color: #334155 !important; }
+                .dark .border-slate-100 { border-color: #334155 !important; }
+                .dark .bg-slate-50 { background-color: #0f172a !important; }
+                .dark .bg-slate-100 { background-color: #0f172a !important; }
+                .dark .hover\\:bg-slate-50:hover { background-color: #334155 !important; }
+                .dark input, .dark select, .dark textarea { 
+                    background-color: #0f172a !important; 
+                    border-color: #334155 !important;
+                    color: #f1f5f9 !important;
+                }
             `}</style>
         </div>
     );
