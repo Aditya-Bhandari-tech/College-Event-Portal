@@ -21,18 +21,10 @@ import ConfirmDialog from '../components/common/ConfirmDialog';
 import RecruitmentCard from '../components/specific/RecruitmentCard';
 import GalleryMediaGrid from '../components/specific/GalleryMediaGrid';
 import SuccessModal from '../components/common/SuccessModal';
+import EventApprovalsView from '../components/specific/EventApprovalsView';
 
 // Branch options with full names (used across components)
-const BRANCHES = [
-  { value: 'ALL', label: 'All Branches' },
-  { value: 'CSE', label: 'Computer Science Engineering' },
-  { value: 'IT', label: 'Information Technology' },
-  { value: 'ENTC', label: 'Electronics & Telecommunication Engineering' },
-  { value: 'ME', label: 'Mechanical Engineering' },
-  { value: 'CE', label: 'Civil Engineering' },
-  { value: 'EE', label: 'Electrical Engineering' },
-  { value: 'AE', label: 'Automobile Engineering' },
-];
+import { BRANCHES } from '../utils/constants';
 
 // Role-based dashboard for Campus Pulse
 // Supports: Student, Faculty, Admin roles
@@ -479,6 +471,11 @@ const Dashboard = () => {
           .flatMap(e => e.images.map(img => img.url))
           .slice(0, 6);
         setRecentPhotos(allPhotos);
+        // Fetch admin-specific data if applicable
+        if (user.role === 'admin') {
+          fetchEventRequests();
+          fetchUsers();
+        }
       } catch (err) {
         console.error("Dashboard fetch error:", err);
         setError("Failed to load dashboard data");
@@ -520,7 +517,7 @@ const Dashboard = () => {
       ? [
         { name: 'My Registrations', icon: CheckCheck },
         { name: 'My Applications', icon: Briefcase },
-        { name: 'My Event Requests', icon: FileText },
+        { name: 'Event Requests', icon: FileText },
       ]
       : []),
 
@@ -567,7 +564,7 @@ const Dashboard = () => {
     { name: 'Browse Events', icon: Calendar, subtitle: 'Discover and register for events', action: 'Events' },
     { name: 'My Registrations', icon: CheckCheck, subtitle: 'View events you are signed up for', action: 'My Registrations' },
     { name: 'Apply for Roles', icon: Briefcase, subtitle: 'Volunteer and recruitment roles', action: 'My Applications' },
-    { name: 'Request an Event', icon: Plus, subtitle: 'Submit a new event proposal', action: 'My Event Requests' },
+    { name: 'Request an Event', icon: Plus, subtitle: 'Submit a new event proposal', action: 'Event Requests' },
   ] : user.role === 'faculty' ? [
     { name: 'Create Event', icon: UserPlus, subtitle: 'Organize a new event', path: '/faculty' },
     { name: 'Manage Events', icon: Calendar, subtitle: 'View and edit your events', path: '/faculty' },
@@ -1288,7 +1285,6 @@ const Dashboard = () => {
           {/* Student Specific Views */}
           {activeRoute === 'My Registrations' && <StudentMyRegistrationsView axiosInstance={axiosInstance} user={user} />}
           {activeRoute === 'My Applications' && <StudentMyApplicationsView axiosInstance={axiosInstance} user={user} />}
-          {activeRoute === 'My Event Requests' && <StudentMyEventRequestsView axiosInstance={axiosInstance} user={user} />}
 
           {activeRoute === 'Recruitment' && <RecruitmentView axiosInstance={axiosInstance} user={user} openConfirm={openConfirm} closeConfirm={closeConfirm} setConfirmDialog={setConfirmDialog} showToast={showToast} />}
           {activeRoute === 'Approve Event' && <EventApprovalsView pendingEventRequests={pendingEventRequests} fetchEventRequests={fetchEventRequests} showToast={showToast} openConfirm={openConfirm} closeConfirm={closeConfirm} setConfirmDialog={setConfirmDialog} />}
@@ -2262,111 +2258,7 @@ const RecruitmentView = ({ axiosInstance, user, openConfirm, closeConfirm, setCo
 
 // ─── Faculty Requests View (Admin) ────────────────────────────────────────────
 // ─── Event Approvals View (Admin) ───────────────────────────────────────────
-const EventApprovalsView = ({ pendingEventRequests, fetchEventRequests, showToast, openConfirm, closeConfirm, setConfirmDialog }) => {
-  const handleApprove = async (id) => {
-    try {
-      await axiosInstance.patch(`/event-requests/${id}/approve`);
-      showToast('Event approved successfully!');
-      fetchEventRequests();
-    } catch (err) {
-      showToast('Failed to approve event.', 'error');
-    }
-  };
-
-  const handleReject = (id) => {
-    openConfirm({
-      title: 'Reject Event Request',
-      message: 'Are you sure you want to reject this event request? This action cannot be undone.',
-      confirmLabel: 'Reject',
-      variant: 'danger',
-      onConfirm: async () => {
-        setConfirmDialog(d => ({ ...d, loading: true }));
-        try {
-          await axiosInstance.patch(`/event-requests/${id}/reject`);
-          showToast('Event request rejected.');
-          fetchEventRequests();
-          closeConfirm();
-        } catch (err) {
-          showToast('Failed to reject event.', 'error');
-          closeConfirm();
-        }
-      },
-    });
-  };
-
-  return (
-    <div className="space-y-6 animate-fadeIn">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-xl md:text-2xl font-bold text-slate-900">Event Approvals</h2>
-          <p className="text-sm text-slate-500 mt-0.5">Review and approve student event proposals</p>
-        </div>
-        {pendingEventRequests.length > 0 && (
-          <span className="px-3 py-1 bg-blue-100 text-blue-700 text-sm font-bold rounded-full">
-            {pendingEventRequests.length} Pending
-          </span>
-        )}
-      </div>
-
-      {/* Empty State */}
-      {pendingEventRequests.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
-          <div className="w-20 h-20 bg-emerald-50 rounded-3xl flex items-center justify-center mb-5">
-            <FileCheck size={38} className="text-emerald-400" />
-          </div>
-          <h3 className="font-bold text-slate-700 text-xl mb-2">All Clear!</h3>
-          <p className="text-slate-400 text-sm text-center max-w-xs leading-relaxed">
-            There are no pending event requests at the moment. New requests will appear here when students submit proposals.
-          </p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {pendingEventRequests.map((req) => (
-            <div key={req._id} className="bg-white rounded-2xl p-4 md:p-6 shadow-sm border border-slate-200 hover:shadow-md transition-all">
-              <div className="flex flex-col md:flex-row justify-between gap-4 md:gap-6">
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-slate-900 text-lg mb-2 truncate">{req.title}</h3>
-                  <p className="text-slate-600 text-sm mb-4 line-clamp-2">{req.description}</p>
-
-                  <div className="flex flex-wrap gap-4 text-xs text-slate-500">
-                    <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
-                      <User size={14} className="text-blue-500" />
-                      <span className="font-semibold text-slate-700">{req.requestedBy?.name || 'Unknown'}</span> ({req.branch})
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
-                      <Calendar size={14} className="text-amber-500" />
-                      <span>{new Date(req.date).toLocaleDateString()}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-100">
-                      <MapPin size={14} className="text-emerald-500" />
-                      <span className="truncate max-w-[150px]">{req.venue}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3 self-end md:self-center">
-                  <button
-                    onClick={() => handleApprove(req._id)}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-xl font-bold text-sm hover:bg-green-600 transition-colors shadow-lg shadow-green-500/20"
-                  >
-                    <Check size={16} /> Approve
-                  </button>
-                  <button
-                    onClick={() => handleReject(req._id)}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 border border-red-100 rounded-xl font-bold text-sm hover:bg-red-100 transition-colors"
-                  >
-                    <X size={16} /> Reject
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
+// Now imported from components/specific/EventApprovalsView.jsx
 
 const FacultyRequestsView = ({ pendingFaculty, allUsers, fetchUsers, handleApprove, handleReject }) => {
   return (
@@ -2447,6 +2339,7 @@ const UserManagementView = ({ allUsers, onDelete }) => {
   const [roleFilter, setRoleFilter] = React.useState('all');
   const [branchFilter, setBranchFilter] = React.useState('ALL');
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [sortBy, setSortBy] = React.useState('name'); // 'name' | 'branch' | 'role'
   const [sortOrder, setSortOrder] = React.useState('asc'); // 'asc' | 'desc'
 
   const filtered = React.useMemo(() => {
@@ -2459,19 +2352,38 @@ const UserManagementView = ({ allUsers, onDelete }) => {
       return matchRole && matchBranch && matchSearch;
     });
 
-    // Apply sorting by name
+    // Apply sorting
     result.sort((a, b) => {
-      const nameA = a.name?.toLowerCase() || '';
-      const nameB = b.name?.toLowerCase() || '';
-      if (sortOrder === 'asc') {
-        return nameA.localeCompare(nameB);
+      let valA = '';
+      let valB = '';
+
+      if (sortBy === 'branch') {
+        valA = a.branch?.toLowerCase() || '';
+        valB = b.branch?.toLowerCase() || '';
+      } else if (sortBy === 'role') {
+        valA = a.role?.toLowerCase() || '';
+        valB = b.role?.toLowerCase() || '';
       } else {
-        return nameB.localeCompare(nameA);
+        valA = a.name?.toLowerCase() || '';
+        valB = b.name?.toLowerCase() || '';
+      }
+
+      // If primary sort values match, fallback to sorting by name ascending
+      if (valA === valB) {
+        const nameA = a.name?.toLowerCase() || '';
+        const nameB = b.name?.toLowerCase() || '';
+        return sortOrder === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      }
+
+      if (sortOrder === 'asc') {
+        return valA.localeCompare(valB);
+      } else {
+        return valB.localeCompare(valA);
       }
     });
 
     return result;
-  }, [allUsers, roleFilter, branchFilter, searchQuery, sortOrder]);
+  }, [allUsers, roleFilter, branchFilter, searchQuery, sortOrder, sortBy]);
 
   const roleTabs = [
     { key: 'all', label: 'All Users', count: allUsers.length },
@@ -2494,12 +2406,24 @@ const UserManagementView = ({ allUsers, onDelete }) => {
           <h2 className="text-xl md:text-2xl font-bold text-slate-900">User Management</h2>
           <p className="text-sm text-slate-500 mt-0.5">{allUsers.length} total registered users</p>
         </div>
-        <button
-          onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
-          className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
-        >
-          {sortOrder === 'asc' ? 'Sort A-Z' : 'Sort Z-A'}
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all shadow-sm outline-none"
+          >
+            <option value="name">Sort by Name</option>
+            <option value="branch">Sort by Branch</option>
+            <option value="role">Sort by Role</option>
+          </select>
+          <button
+            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+            className="flex items-center gap-2 px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+            title="Toggle sort direction"
+          >
+            {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
+          </button>
+        </div>
       </div>
 
       {/* Role Filter Tabs */}
@@ -2728,67 +2652,6 @@ const StudentMyApplicationsView = ({ axiosInstance, user }) => {
   );
 };
 
-const StudentMyEventRequestsView = ({ axiosInstance, user }) => {
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchRequests = async () => {
-      try {
-        const res = await axiosInstance.get('/event-requests');
-        const allReqs = res.data.data || [];
-        // Filter by requestedBy user ID
-        const myReqs = allReqs.filter(r => (r.requestedBy?._id || r.requestedBy) === user._id);
-        setRequests(myReqs);
-      } catch (err) {
-        console.error("Failed to fetch event requests:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchRequests();
-  }, [axiosInstance, user._id]);
-
-  if (loading) return <div className="flex justify-center py-20"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" /></div>;
-
-  return (
-    <div className="space-y-6 animate-fadeIn">
-      <div>
-        <h2 className="text-2xl font-bold text-slate-900">My Event Requests</h2>
-        <p className="text-slate-500 text-sm">Status of your submitted event proposals</p>
-      </div>
-
-      {requests.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-dashed border-slate-300 shadow-sm">
-          <FileText className="text-slate-300 mb-4" size={48} />
-          <p className="text-slate-500 font-medium text-lg">No event requests</p>
-          <p className="text-slate-400 text-sm">Have a cool event idea? Submit a proposal to the admin!</p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {requests.map(req => (
-            <div key={req._id} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
-              <div className="flex justify-between items-start gap-4 mb-4">
-                <div>
-                  <h3 className="font-bold text-slate-900 text-lg mb-1">{req.title}</h3>
-                  <div className="flex items-center gap-3 text-xs text-slate-500">
-                    <span className="flex items-center gap-1.5"><Calendar size={14} /> {new Date(req.date).toLocaleDateString()}</span>
-                    <span className="flex items-center gap-1.5"><MapPin size={14} /> {req.venue}</span>
-                  </div>
-                </div>
-                <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest shadow-sm ${req.status === 'approved' ? 'bg-emerald-500 text-white' :
-                  req.status === 'rejected' ? 'bg-red-500 text-white' : 'bg-amber-500 text-white'
-                  }`}>
-                  {req.status}
-                </span>
-              </div>
-              <p className="text-slate-600 text-sm line-clamp-2 italic">"{req.description}"</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-};
 
 export default Dashboard;
