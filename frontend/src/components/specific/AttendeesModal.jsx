@@ -1,16 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { X, Users, FileText, Search, Filter } from 'lucide-react';
 
-const BRANCHES = [
-    { value: 'ALL', label: 'All Branches' },
-    { value: 'Computer Science', label: 'Computer Science' },
-    { value: 'Information Technology', label: 'Information Technology' },
-    { value: 'Electronics and Telecommunication Engineering', label: 'Electronics & Telecom' },
-    { value: 'Mechanical Engineering', label: 'Mechanical Engineering' },
-    { value: 'Civil Engineering', label: 'Civil Engineering' },
-    { value: 'Electrical Engineering', label: 'Electrical Engineering' },
-    { value: 'Automobile Engineering', label: 'Automobile Engineering' },
-];
+import { BRANCHES } from '../../utils/constants';
 
 const YEARS = [
     { value: 'ALL', label: 'All Years' },

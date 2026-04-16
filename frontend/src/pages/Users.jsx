@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import axiosInstance from "../api/axios";
+import { BRANCHES } from '../utils/constants';
 import { Trash2, UserCheck, Shield, Search, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import Loader from "../components/common/Loader";
@@ -14,16 +15,7 @@ const Users = () => {
   const [branchFilter, setBranchFilter] = useState("ALL");
   const [sortOrder, setSortOrder] = useState("asc");
 
-  const branches = [
-    { value: 'ALL', label: 'All Branches' },
-    { value: 'CSE', label: 'Computer Science Engineering' },
-    { value: 'IT', label: 'Information Technology' },
-    { value: 'ENTC', label: 'Electronics & Telecommunication Engineering' },
-    { value: 'Mechanical', label: 'Mechanical Engineering' },
-    { value: 'Civil', label: 'Civil Engineering' },
-    { value: 'Electrical', label: 'Electrical Engineering' },
-    { value: 'Automobile', label: 'Automobile Engineering' },
-  ];
+  const branches = BRANCHES;
 
   const fetchUsers = async () => {
     try {

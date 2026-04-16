@@ -23,4 +23,18 @@ axiosInstance.interceptors.request.use(
   }
 );
 
+// Global Response Interceptor for handling token expiration
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response && error.response.status === 401) {
+      // Auto-logout the user if their token is expired or unauthorized
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login'; // Force redirect to login
+    }
+    return Promise.reject(error);
+  }
+);
+
 export default axiosInstance;

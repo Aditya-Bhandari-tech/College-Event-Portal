@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Calendar, MapPin, Clock, X, FileText, Send } from 'lucide-react';
+import { ArrowLeft, Plus, Calendar, MapPin, Clock, X, FileText, Send, AlertCircle, XCircle, Check } from 'lucide-react';
 import axiosInstance from '../api/axios';
+import { BRANCHES } from '../utils/constants';
 import Loader from '../components/common/Loader';
 import EmptyState from '../components/common/EmptyState';
+import SuccessModal from '../components/common/SuccessModal';
 
 const EventRequests = () => {
     const navigate = useNavigate();
@@ -17,17 +19,11 @@ const EventRequests = () => {
         venue: '',
         branch: 'ALL'
     });
+    const [formError, setFormError] = useState('');
+    const [submitting, setSubmitting] = useState(false);
+    const [showSuccess, setShowSuccess] = useState(false);
 
-    const branches = [
-        { value: 'ALL', label: 'All Branches' },
-        { value: 'CSE', label: 'Computer Science Engineering' },
-        { value: 'IT', label: 'Information Technology' },
-        { value: 'ENTC', label: 'Electronics & Telecommunication Engineering' },
-        { value: 'ME', label: 'Mechanical Engineering' },
-        { value: 'CE', label: 'Civil Engineering' },
-        { value: 'EE', label: 'Electrical Engineering' },
-        { value: 'AE', label: 'Automobile Engineering' },
-    ];
+    const branches = BRANCHES;
 
     useEffect(() => {
         fetchRequests();
@@ -47,14 +43,18 @@ const EventRequests = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+        setFormError('');
+        setSubmitting(true);
         try {
             await axiosInstance.post('/event-requests', formData);
-            setTab('list');
+            setShowSuccess(true);
             setFormData({ title: '', description: '', date: '', venue: '', branch: 'ALL' });
             fetchRequests();
         } catch (error) {
             console.error("Failed to submit request", error);
-            alert("Failed to submit request.");
+            setFormError(error.response?.data?.message || 'Failed to submit request. Please try again.');
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -94,6 +94,16 @@ const EventRequests = () => {
                         </div>
 
                         <form onSubmit={handleSubmit} className="p-8 md:p-12 space-y-8">
+                            {formError && (
+                                <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3 animate-fadeIn">
+                                    <AlertCircle className="text-red-500 mt-0.5" size={18} />
+                                    <div>
+                                        <h4 className="text-red-800 font-bold text-sm">Submission Error</h4>
+                                        <p className="text-red-600 text-sm mt-0.5">{formError}</p>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="space-y-2">
                                 <label className="block text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Proposed Event Title</label>
                                 <input
@@ -172,10 +182,11 @@ const EventRequests = () => {
                                 </button>
                                 <button
                                     type="submit"
-                                    className="flex-[2] py-4 px-6 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:shadow-indigo-200 hover:-translate-y-1 transition-all uppercase tracking-widest flex items-center justify-center gap-3"
+                                    disabled={submitting}
+                                    className="flex-[2] py-4 px-6 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-2xl font-black text-sm shadow-xl shadow-indigo-100 hover:shadow-indigo-200 hover:-translate-y-1 transition-all uppercase tracking-widest flex items-center justify-center gap-3 disabled:opacity-70 disabled:hover:translate-y-0"
                                 >
-                                    <Send size={18} />
-                                    Submit Proposal
+                                    {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Send size={18} />}
+                                    {submitting ? 'Submitting...' : 'Submit Proposal'}
                                 </button>
                             </div>
                         </form>
@@ -190,10 +201,13 @@ const EventRequests = () => {
                                         <div className="flex-1">
                                             <div className="flex flex-wrap items-center gap-3 mb-3">
                                                 <h3 className="text-2xl font-black text-slate-900 group-hover:text-indigo-600 transition-colors uppercase tracking-tight">{req.title}</h3>
-                                                <span className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-full shadow-sm ${req.status === 'approved' ? 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200/50' :
-                                                    req.status === 'rejected' ? 'bg-rose-50 text-rose-600 ring-1 ring-rose-200/50' :
-                                                        'bg-amber-50 text-amber-600 ring-1 ring-amber-200/50 shadow-amber-100'
+                                                <span className={`px-4 py-1.5 text-[10px] font-black uppercase tracking-widest rounded-full shadow-sm border ${
+                                                    req.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-100 flex items-center gap-1.5' :
+                                                    req.status === 'rejected' ? 'bg-rose-50 text-rose-700 border-rose-100 flex items-center gap-1.5' :
+                                                    'bg-amber-50 text-amber-700 border-amber-100 flex items-center gap-1.5'
                                                     }`}>
+                                                    {req.status === 'approved' && <Check size={12} />}
+                                                    {req.status === 'rejected' && <XCircle size={12} />}
                                                     {req.status}
                                                 </span>
                                             </div>
@@ -224,13 +238,19 @@ const EventRequests = () => {
                                             </div>
                                         </div>
 
-                                        {req.reviewComment && (
-                                            <div className="bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100 md:max-w-xs w-full">
-                                                <div className="flex items-center gap-2 mb-3 text-indigo-600">
+                                        {(req.reviewComment || req.status === 'rejected') && (
+                                            <div className={`p-6 rounded-[2rem] border md:max-w-xs w-full shadow-sm transition-all ${
+                                                req.status === 'rejected' ? 'bg-rose-50/50 border-rose-100 hover:shadow-rose-100' : 'bg-slate-50/50 border-slate-100'
+                                            }`}>
+                                                <div className={`flex items-center gap-2 mb-3 ${req.status === 'rejected' ? 'text-rose-600' : 'text-indigo-600'}`}>
                                                     <FileText size={18} />
-                                                    <span className="font-black text-[10px] uppercase tracking-widest">Administrator's Note</span>
+                                                    <span className="font-black text-[10px] uppercase tracking-widest">
+                                                        {req.status === 'rejected' ? 'Rejection Reason' : 'Faculty Response'}
+                                                    </span>
                                                 </div>
-                                                <p className="text-slate-600 text-sm font-medium italic leading-relaxed">"{req.reviewComment}"</p>
+                                                <p className={`text-sm font-medium italic leading-relaxed ${req.status === 'rejected' ? 'text-rose-800' : 'text-slate-600'}`}>
+                                                    {req.reviewComment ? `"${req.reviewComment}"` : (req.status === 'rejected' ? "This request was declined by faculty." : "Your request is under review.")}
+                                                </p>
                                             </div>
                                         )}
                                     </div>
@@ -244,6 +264,18 @@ const EventRequests = () => {
                     )
                 )}
             </div>
+
+            <SuccessModal
+                open={showSuccess}
+                onClose={() => {
+                    setShowSuccess(false);
+                    setTab('list');
+                }}
+                title="Proposal Received!"
+                message="Your event request has been successfully submitted to the faculty and admin for review. You can track its status in the 'My Requests' tab."
+                hideActions={true}
+                autoCloseMs={4000}
+            />
         </div >
     );
 };

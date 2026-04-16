@@ -1,6 +1,7 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { BRANCH_NAMES } from '../../utils/constants';
 
 const RoleSelectionModal = ({ isOpen, onClose, onSubmit, userName }) => {
   const [formData, setFormData] = useState({
@@ -13,15 +14,7 @@ const RoleSelectionModal = ({ isOpen, onClose, onSubmit, userName }) => {
   const years = ["First Year", "Second Year", "Third Year"];
   const [error, setError] = useState('');
 
-  const branches = [
-    "Information Technology",
-    "Computer Science",
-    "Automobile Engineering",
-    "Electrical Engineering",
-    "Mechanical Engineering",
-    "Electronics and Telecommunication Engineering",
-    "Civil Engineering",
-  ];
+  const branches = BRANCH_NAMES;
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });

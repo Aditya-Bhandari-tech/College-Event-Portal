@@ -9,7 +9,7 @@ import NotFound from "./pages/NotFound";
 import EventRequests from "./pages/EventRequests";
 import Recruitment from "./pages/Recruitment";
 import Users from "./pages/Users";
-import AdminEventApprovals from "./pages/AdminEventApprovals";
+
 import { ThemeProvider } from "./contexts/ThemeContext";
 
 import ProtectedRoute from "./components/AuthComponents/ProtectedRoute";
@@ -39,7 +39,6 @@ export default function App() {
 
         {/* Admin Pages */}
         <Route path="/admin/users" element={<ProtectedRoute><Users /></ProtectedRoute>} />
-        <Route path="/admin/events" element={<ProtectedRoute><AdminEventApprovals /></ProtectedRoute>} />
         <Route path="/admin/settings" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
 
         <Route path="*" element={<NotFound />} />

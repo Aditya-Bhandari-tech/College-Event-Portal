@@ -18,7 +18,9 @@ import RecruitmentCard from '../components/specific/RecruitmentCard';
 import GalleryMediaGrid from '../components/specific/GalleryMediaGrid';
 import Events from './Events';
 import Announcements from './Announcements';
-import EventRequests from './EventRequests';
+import EventApprovalsView from '../components/specific/EventApprovalsView';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+import SuccessModal from '../components/common/SuccessModal';
 
 // ─── HELPER COMPONENTS ────────────────────────────────────────────────────────
 
@@ -447,6 +449,21 @@ const FacultyDashboard = () => {
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [activeRoute, setActiveRoute] = useState('Dashboard');
     const [showProfilePanel, setShowProfilePanel] = useState(false);
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    // ── Dialog / Toast State ──────────────────────────────────────────────────
+    const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null, variant: 'danger', loading: false });
+    const openConfirm = (opts) => setConfirmDialog({ open: true, loading: false, variant: 'danger', ...opts });
+    const closeConfirm = () => setConfirmDialog(d => ({ ...d, open: false, loading: false }));
+
+    const [toast, setToast] = useState(null);
+    const showToast = (msg, type = 'success') => {
+        setToast({ msg, type });
+        setTimeout(() => setToast(null), 3000);
+    };
+
+    const [showSuccessModal, setShowSuccessModal] = useState(false);
+    const [successEvent, setSuccessEvent] = useState(null);
 
     // ── Notification state ───────────────────────────────────────
     const [notifOpen, setNotifOpen] = useState(false);
@@ -584,6 +601,7 @@ const FacultyDashboard = () => {
 
     // Data Lists
     const [students, setStudents] = useState([]);
+    const [pendingEventRequests, setPendingEventRequests] = useState([]);
 
     // Loading States
     const [loading, setLoading] = useState({
@@ -631,10 +649,23 @@ const FacultyDashboard = () => {
         if (!user) return;
         if (activeRoute === 'Dashboard') {
             fetchStats();
+            fetchEventRequests();
         } else if (activeRoute === 'Students') {
             fetchStudents();
+        } else if (activeRoute === 'Event Requests') {
+            fetchEventRequests();
         }
     }, [activeRoute, user]);
+
+    const fetchEventRequests = async () => {
+        try {
+            const res = await axiosInstance.get('/event-requests');
+            const pending = (res.data.data || []).filter(r => r.status === 'pending');
+            setPendingEventRequests(pending);
+        } catch (error) {
+            console.error("Failed to fetch event requests", error);
+        }
+    };
 
     // API Calls
     const fetchStats = async () => {
@@ -703,7 +734,11 @@ const FacultyDashboard = () => {
     const navigation = [
         { name: 'Dashboard', icon: UserCheck },
         { name: 'Events', icon: Calendar },
-        { name: 'Event Requests', icon: Award },
+        { 
+            name: 'Event Requests', 
+            icon: Award, 
+            badge: pendingEventRequests.length > 0 ? pendingEventRequests.length : null 
+        },
         { name: 'Recruitment', icon: UserPlus },
         { name: 'Students', icon: Users },
         { name: 'Announcements', icon: Bell },
@@ -738,7 +773,12 @@ const FacultyDashboard = () => {
                             return (
                                 <button key={item.name} onClick={() => handleRouteChange(item.name)} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-white'} ${sidebarCollapsed && !mobileSidebarOpen ? 'justify-center' : ''}`}>
                                     <Icon size={20} />
-                                    {(!sidebarCollapsed || mobileSidebarOpen) && <span className="font-medium">{item.name}</span>}
+                                    {(!sidebarCollapsed || mobileSidebarOpen) && <span className="font-medium flex-1 text-left">{item.name}</span>}
+                                    {(!sidebarCollapsed || mobileSidebarOpen) && item.badge && (
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${isActive ? 'bg-white/30 text-white' : 'bg-amber-500 text-white'}`}>
+                                            {item.badge}
+                                        </span>
+                                    )}
                                 </button>
                             )
                         })}
@@ -929,7 +969,14 @@ const FacultyDashboard = () => {
                     )}
 
                     {activeRoute === 'Events' && <Events userRole={user.role} user={user} />}
-                    {activeRoute === 'Event Requests' && <EventRequests />}
+                    {activeRoute === 'Event Requests' && <EventApprovalsView 
+                        pendingEventRequests={pendingEventRequests} 
+                        fetchEventRequests={fetchEventRequests} 
+                        showToast={(msg, type) => showToast ? showToast(msg, type) : alert(msg)} 
+                        openConfirm={openConfirm} 
+                        closeConfirm={closeConfirm} 
+                        setConfirmDialog={setConfirmDialog} 
+                    />}
                     {activeRoute === 'Recruitment' && <FacultyRecruitmentView axiosInstance={axiosInstance} user={user} />}
                     {activeRoute === 'Students' && (
                         <div className="animate-fadeIn">
@@ -985,6 +1032,27 @@ const FacultyDashboard = () => {
             </main>
 
             <ProfileModal open={showProfilePanel} onClose={() => setShowProfilePanel(false)} user={user} onUserUpdate={(u) => { setUser(u); localStorage.setItem('user', JSON.stringify(u)); setShowProfilePanel(false); }} onLogout={handleLogout} />
+
+            {/* Global Overlay Components */}
+            {toast && (
+                <div className={`fixed bottom-8 left-1/2 -translate-x-1/2 z-[1000] px-6 py-3 rounded-2xl shadow-2xl animate-fadeIn flex items-center gap-3 border ${toast.type === 'error' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-white text-slate-900 border-slate-100'}`}>
+                    <div className={`w-2 h-2 rounded-full ${toast.type === 'error' ? 'bg-red-500' : 'bg-emerald-500'} animate-pulse`} />
+                    <span className="font-bold text-sm tracking-tight">{toast.msg}</span>
+                </div>
+            )}
+
+            <ConfirmDialog
+                {...confirmDialog}
+                onClose={closeConfirm}
+            />
+
+            <SuccessModal
+                open={showSuccessModal}
+                onClose={() => setShowSuccessModal(false)}
+                eventDetails={successEvent}
+                hideActions={true}
+                autoCloseMs={2000}
+            />
 
             <style>{`
                 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }

@@ -11,26 +11,7 @@ import ConfirmDialog from '../components/common/ConfirmDialog';
 import SuccessModal from '../components/common/SuccessModal';
 import { generateNoticePDF } from '../utils/NoticeGenerator';
 
-// Full branch name mapping
-const BRANCH_LABELS = {
-    IT: 'Information Technology',
-    CS: 'Computer Science',
-    ENTC: 'Electronics & Telecom',
-    ME: 'Mechanical Engineering',
-    CE: 'Civil Engineering',
-    ALL: 'All Branches',
-    all: 'All Branches',
-};
-const getBranchLabel = (val) => BRANCH_LABELS[val?.toUpperCase?.()] || val || 'All Branches';
-
-const BRANCH_OPTIONS = [
-    { value: 'ALL', label: 'All Branches' },
-    { value: 'IT', label: 'Information Technology' },
-    { value: 'CS', label: 'Computer Science' },
-    { value: 'ENTC', label: 'Electronics & Telecom' },
-    { value: 'ME', label: 'Mechanical Engineering' },
-    { value: 'CE', label: 'Civil Engineering' },
-];
+import { BRANCHES as BRANCH_OPTIONS, getBranchLabel } from '../utils/constants';
 
 const EMPTY_FORM = { title: '', description: '', date: '', venue: '', branch: 'ALL' };
 

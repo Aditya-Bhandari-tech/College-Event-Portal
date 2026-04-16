@@ -5,14 +5,7 @@ import Loader from '../components/common/Loader';
 import EmptyState from '../components/common/EmptyState';
 import Button from '../components/common/Button';
 
-const BRANCH_OPTIONS = [
-    { value: 'all', label: 'All Branches' },
-    { value: 'IT', label: 'Information Technology' },
-    { value: 'CS', label: 'Computer Science' },
-    { value: 'ENTC', label: 'Electronics & Telecom' },
-    { value: 'ME', label: 'Mechanical Engineering' },
-    { value: 'CE', label: 'Civil Engineering' },
-];
+import { BRANCHES as BRANCH_OPTIONS } from '../utils/constants';
 
 const EMPTY_FORM = { title: '', message: '', branch: 'all', important: false };
 

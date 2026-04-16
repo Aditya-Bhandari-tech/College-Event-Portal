@@ -88,10 +88,10 @@ export const getAllEventRequests = async (req, res, next) => {
       filter.status = status;
     }
 
-    // Branch-based filter: faculty only sees its branch
+    // Branch-based filter: faculty sees their branch AND "ALL" requests
     if (req.user.role === "faculty") {
       if (req.user.branch) {
-        filter.branch = req.user.branch;
+        filter.branch = { $in: [req.user.branch, "all", "ALL"] };
       }
     }
     // If admin → no branch filter (can see all)
